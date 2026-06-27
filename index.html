@@ -162,7 +162,7 @@
   }
   .modal::-webkit-scrollbar { display: none; }
 
-  .modal-img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 24px 24px 0 0; }
+  .modal-img { width: 100%; max-height: 55vh; object-fit: contain; border-radius: 24px 24px 0 0; background:#1a1a1a; }
   .modal-body { padding: 24px 28px 32px; }
   .modal-nombre { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
   .modal-cat { font-size: 13px; color: var(--ink-soft); margin-bottom: 16px; }
@@ -294,37 +294,114 @@
     <div style="display:flex;align-items:center;gap:14px;">
       <img src="logo-beloma.png" alt="Beloma" style="height:42px;">
     </div>
-    <button class="header-carrito" onclick="abrirCarrito()">
-      🛒 Mi pedido
-      <div class="carrito-badge" id="carrito-badge">0</div>
-    </button>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="header-carrito" onclick="abrirCarrito()">
+        🛒 Mi pedido
+        <div class="carrito-badge" id="carrito-badge">0</div>
+      </button>
+    </div>
   </header>
 
-  <!-- Filtros -->
-  <div class="filtros">
-    <button class="filtro-btn activo" data-cat="" onclick="filtrarCat(this, '')">✨ Todos</button>
-    <div class="filtro-sep"></div>
-    <!-- Categorías se generan dinámicamente -->
-    <div id="filtros-cats" style="display:contents;"></div>
-    <div class="filtro-sep"></div>
-    <button class="filtro-btn" data-gen="" onclick="filtrarGen(this, '')">👥 Todos</button>
-    <button class="filtro-btn" data-gen="Hombre" onclick="filtrarGen(this, 'Hombre')">👨 Hombre</button>
-    <button class="filtro-btn" data-gen="Mujer" onclick="filtrarGen(this, 'Mujer')">👩 Mujer</button>
-    <button class="filtro-btn" data-gen="Niño" onclick="filtrarGen(this, 'Niño')">👦 Niño</button>
+  <!-- PANTALLA INICIO: Secciones -->
+  <div id="vista-inicio" style="flex:1;overflow-y:auto;padding:20px 28px;">
+
+    <!-- Barra de búsqueda rápida -->
+    <div style="display:flex;gap:10px;margin-bottom:24px;">
+      <input type="text" id="busqueda-rapida" placeholder="🔍 Buscar diseño..."
+        oninput="buscarRapido(this.value)"
+        style="flex:1;background:var(--card);border:2px solid var(--border);border-radius:50px;
+               padding:14px 20px;color:var(--ink);font-size:15px;font-family:'Inter',sans-serif;outline:none;">
+      <button onclick="verTodos()" style="padding:14px 24px;background:var(--card);
+        border:2px solid var(--border);border-radius:50px;color:var(--ink-soft);
+        font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;">
+        Ver todos →
+      </button>
+    </div>
+
+    <!-- Sección: Destacados -->
+    <div id="sec-destacados" style="margin-bottom:32px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-size:20px;font-weight:800;">⭐ Destacados</div>
+        <button onclick="verSeccion('destacado')" style="font-size:13px;color:var(--green);background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;">Ver todos →</button>
+      </div>
+      <div id="grid-destacados" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;"></div>
+      <div id="empty-destacados" style="display:none;color:var(--ink-soft);font-size:14px;padding:20px 0;">Sin diseños destacados aún.</div>
+    </div>
+
+    <!-- Sección: Nuevos -->
+    <div id="sec-nuevos" style="margin-bottom:32px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-size:20px;font-weight:800;">🆕 Nuevos diseños</div>
+        <button onclick="verSeccion('nuevo')" style="font-size:13px;color:var(--green);background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;">Ver todos →</button>
+      </div>
+      <div id="grid-nuevos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;"></div>
+      <div id="empty-nuevos" style="display:none;color:var(--ink-soft);font-size:14px;padding:20px 0;">Sin diseños nuevos aún.</div>
+    </div>
+
+    <!-- Sección: Más vendidos -->
+    <div id="sec-vendidos" style="margin-bottom:32px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-size:20px;font-weight:800;">🔥 Más vendidos</div>
+        <button onclick="verSeccion('mas_vendido')" style="font-size:13px;color:var(--green);background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;">Ver todos →</button>
+      </div>
+      <div id="grid-vendidos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;"></div>
+      <div id="empty-vendidos" style="display:none;color:var(--ink-soft);font-size:14px;padding:20px 0;">Sin diseños marcados aún.</div>
+    </div>
+
+    <!-- Sección: En descuento -->
+    <div id="sec-descuento" style="margin-bottom:32px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-size:20px;font-weight:800;">💥 En descuento</div>
+        <button onclick="verSeccion('descuento')" style="font-size:13px;color:var(--green);background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;">Ver todos →</button>
+      </div>
+      <div id="grid-descuento" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;"></div>
+      <div id="empty-descuento" style="display:none;color:var(--ink-soft);font-size:14px;padding:20px 0;">Sin diseños en descuento aún.</div>
+    </div>
   </div>
 
-  <!-- Grid catálogo -->
-  <div id="catalogo-wrap">
-    <div class="empty-state">
-      <div class="icon">⏳</div>
-      <p>Cargando diseños...</p>
+  <!-- VISTA TODOS / FILTROS -->
+  <div id="vista-todos" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+    <!-- Barra volver + filtros -->
+    <div style="background:var(--dark2);border-bottom:1px solid var(--border);padding:12px 20px;flex-shrink:0;">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
+        <button onclick="volverInicio()" style="padding:10px 18px;border-radius:50px;border:2px solid var(--border);
+          background:none;color:var(--ink);font-size:14px;font-weight:700;cursor:pointer;
+          font-family:'Inter',sans-serif;">← Inicio</button>
+        <input type="text" id="busqueda-todos" placeholder="🔍 Buscar..."
+          oninput="renderCatalogo()"
+          style="flex:1;background:var(--card);border:2px solid var(--border);border-radius:50px;
+                 padding:10px 16px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;">
+      </div>
+      <div class="filtros" style="padding:0;background:none;border:none;overflow-x:auto;">
+        <button class="filtro-btn activo" data-cat="" onclick="filtrarCat(this,'')">✨ Todos</button>
+        <div class="filtro-sep"></div>
+        <div id="filtros-cats" style="display:contents;"></div>
+        <div class="filtro-sep"></div>
+        <button class="filtro-btn activo" data-gen="" onclick="filtrarGen(this,'')">👥 Todos</button>
+        <button class="filtro-btn" data-gen="Hombre" onclick="filtrarGen(this,'Hombre')">👨 Hombre</button>
+        <button class="filtro-btn" data-gen="Mujer" onclick="filtrarGen(this,'Mujer')">👩 Mujer</button>
+        <button class="filtro-btn" data-gen="Niño" onclick="filtrarGen(this,'Niño')">👦 Niño</button>
+      </div>
+    </div>
+    <!-- Grid -->
+    <div id="catalogo-wrap" style="flex:1;overflow-y:auto;padding:20px 28px;
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;align-content:start;">
+      <div class="empty-state"><div class="icon">⏳</div><p>Cargando...</p></div>
     </div>
   </div>
 </div>
 
 <!-- MODAL DETALLE DISEÑO -->
-<div class="modal-overlay" id="modal-detalle">
-  <div class="modal">
+<div class="modal-overlay" id="modal-detalle" onclick="cerrarDetalleOverlay(event)">
+  <div class="modal" style="position:relative;">
+    <!-- Botón X siempre visible arriba -->
+    <button onclick="cerrarDetalle()" style="position:sticky;top:0;left:0;right:0;z-index:10;
+      width:100%;background:rgba(30,30,30,0.95);border:none;color:#fff;
+      font-size:16px;font-weight:700;padding:14px;cursor:pointer;
+      display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;
+      border-bottom:1px solid rgba(255,255,255,0.1);">
+      ← Volver al catálogo
+    </button>
     <img id="modal-img" src="" alt="" class="modal-img">
     <div class="modal-body">
       <div class="modal-nombre" id="modal-nombre"></div>
@@ -386,14 +463,21 @@
 </div>
 
 <!-- MODAL PEDIDO / DATOS -->
-<div class="modal-overlay" id="modal-pedido">
+<div class="modal-overlay" id="modal-pedido" onclick="cerrarPedidoOverlay(event)">
   <div class="modal">
+    <button onclick="volverAlCarrito()" style="position:sticky;top:0;left:0;right:0;z-index:10;
+      width:100%;background:rgba(30,30,30,0.95);border:none;color:#fff;
+      font-size:16px;font-weight:700;padding:14px;cursor:pointer;
+      display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;
+      border-bottom:1px solid rgba(255,255,255,0.1);">
+      ← Volver al carrito
+    </button>
     <div class="modal-body">
       <h2 style="font-size:22px;font-weight:800;margin-bottom:6px;">📋 Datos del pedido</h2>
       <p style="font-size:14px;color:var(--ink-soft);margin-bottom:20px;">Te contactaremos para confirmar y coordinar la entrega.</p>
 
       <input type="text" class="pedido-input" id="pedido-nombre" placeholder="👤 Tu nombre completo">
-      <input type="tel" class="pedido-input" id="pedido-tel" placeholder="📱 WhatsApp (10 dígitos)">
+      <input type="tel" class="pedido-input" id="pedido-tel" placeholder="📱 Tu WhatsApp (10 dígitos)">
       <input type="email" class="pedido-input" id="pedido-email" placeholder="📧 Correo electrónico (opcional)">
 
       <div class="opcion-label" style="margin-bottom:12px;">Método de pago</div>
@@ -404,29 +488,37 @@
         <button class="metodo-btn" data-metodo="transferencia" onclick="selMetodo(this)">
           <span class="metodo-icon">📲</span>Transferencia
         </button>
-        <button class="metodo-btn" data-metodo="mercadopago" onclick="selMetodo(this)">
-          <span class="metodo-icon">💳</span>Mercado Pago
+        <button class="metodo-btn" data-metodo="terminal" onclick="selMetodo(this)">
+          <span class="metodo-icon">💳</span>Terminal Mercado Pago
         </button>
-        <button class="metodo-btn" data-metodo="tarjeta" onclick="selMetodo(this)">
-          <span class="metodo-icon">🏦</span>Tarjeta en tienda
+        <button class="metodo-btn" data-metodo="mercadopago" onclick="selMetodo(this)">
+          <span class="metodo-icon">📱</span>Link Mercado Pago
         </button>
       </div>
 
-      <!-- Panel de Mercado Pago (se muestra solo si seleccionan esa opción) -->
+      <!-- Panel de Mercado Pago link -->
       <div id="mp-panel" style="display:none;background:var(--dark);border-radius:14px;padding:20px;margin-bottom:16px;text-align:center;">
-        <div style="font-size:14px;color:var(--ink-soft);margin-bottom:16px;">Pago seguro con Mercado Pago</div>
-        <div id="mp-button-container">
-          <!-- El botón de MP se inyecta aquí -->
-          <div style="color:var(--ink-soft);font-size:13px;padding:20px;">
-            ⚙️ Pago en línea próximamente disponible.<br>Por favor selecciona otro método.
-          </div>
+        <div style="font-size:14px;color:var(--ink-soft);">Pago en línea próximamente disponible.<br>Por favor selecciona otro método.</div>
+      </div>
+
+      <!-- Info del local -->
+      <div style="background:var(--dark);border-radius:14px;padding:16px;margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">📍 Dónde encontrarnos</div>
+        <div style="font-size:13px;line-height:1.9;color:var(--ink-soft);">
+          Av. Gutiérrez Nájera #511, Col. Reforma<br>
+          Plaza Nájera, Local 7 — Playeras Beloma<br>
+          📱 WhatsApp: <span style="color:#fff;">669 154 9680</span><br>
+          🕐 Lun–Vie 9:00–17:00 · Sáb 11:00–15:00
         </div>
+        <a href="https://maps.app.goo.gl/vceLVsiqzqiJ23Ja8" target="_blank"
+          style="display:inline-block;margin-top:10px;font-size:12px;color:var(--green);text-decoration:none;">
+          🗺️ Ver en Google Maps →
+        </a>
       </div>
 
       <button class="btn-pagar" id="btn-confirmar-pedido" onclick="confirmarPedido()">
         ✅ Confirmar pedido
       </button>
-      <button class="btn-cerrar-modal" style="width:100%;text-align:center;" onclick="volverAlCarrito()">← Volver al carrito</button>
     </div>
   </div>
 </div>
@@ -436,7 +528,8 @@
   <div class="check">✅</div>
   <div class="folio" id="exito-folio"></div>
   <h1>¡Pedido registrado!</h1>
-  <p id="exito-msg">Te contactaremos pronto por WhatsApp<br>para confirmar tu pedido y coordinar la entrega.</p>
+  <p id="exito-msg"></p>
+  <div id="ws-btn-wrap" style="margin-bottom:16px;"></div>
   <button class="btn-pagar" style="max-width:320px;" onclick="nuevoCliente()">
     🏠 Nuevo pedido
   </button>
@@ -473,6 +566,7 @@ onSnapshot(collection(db, 'bl_disenos'), snap => {
   diseños = snap.docs.map(d => d.data()).filter(d => d.activo);
   renderCatalogo();
   renderFiltrosCats();
+  renderSecciones();
 });
 
 // ── BIENVENIDA ────────────────────────────────────────────
@@ -506,25 +600,17 @@ function renderFiltrosCats() {
 // ── CATÁLOGO ──────────────────────────────────────────────
 function renderCatalogo() {
   const wrap = document.getElementById('catalogo-wrap');
+  const q = (document.getElementById('busqueda-todos')?.value||'').toLowerCase();
   let lista = diseños;
   if(catActual) lista = lista.filter(d => d.categoria === catActual);
   if(genActual) lista = lista.filter(d => !d.genero || d.genero === genActual || d.genero === 'Todos los géneros');
+  if(q) lista = lista.filter(d => d.nombre?.toLowerCase().includes(q) || d.categoria?.toLowerCase().includes(q));
 
   if(lista.length === 0) {
     wrap.innerHTML = `<div class="empty-state"><div class="icon">🎨</div><p>No hay diseños disponibles.</p></div>`;
     return;
   }
-
-  wrap.innerHTML = lista.map(d => `
-    <div class="diseno-card" onclick="abrirDetalle('${d.id}')">
-      <img src="${d.imagen || ''}" alt="${d.nombre}"
-        onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/><text fill=%22%23666%22 font-size=%2240%22 x=%2250%22 y=%2260%22 text-anchor=%22middle%22>👕</text></svg>'">
-      <div class="info">
-        <div class="nombre">${d.nombre}</div>
-        <div class="categoria">${d.categoria || ''}</div>
-        <div class="precio">${d.precio ? '$'+Number(d.precio).toLocaleString('es-MX') : 'Consultar'}</div>
-      </div>
-    </div>`).join('');
+  wrap.innerHTML = lista.map(d => tarjetaDiseno(d)).join('');
 }
 
 // ── DETALLE DISEÑO ────────────────────────────────────────
@@ -547,6 +633,11 @@ window.abrirDetalle = function(id) {
 
 window.cerrarDetalle = function() {
   document.getElementById('modal-detalle').classList.remove('open');
+};
+
+window.cerrarDetalleOverlay = function(e) {
+  // Solo cierra si toca el fondo oscuro, no el contenido del modal
+  if(e.target === document.getElementById('modal-detalle')) cerrarDetalle();
 };
 
 window.selTalla = function(btn) {
@@ -650,6 +741,10 @@ window.volverAlCarrito = function() {
   abrirCarrito();
 };
 
+window.cerrarPedidoOverlay = function(e) {
+  if(e.target === document.getElementById('modal-pedido')) volverAlCarrito();
+};
+
 window.selMetodo = function(btn) {
   metodoPago = btn.dataset.metodo;
   document.querySelectorAll('[data-metodo]').forEach(b => b.classList.remove('sel'));
@@ -666,6 +761,7 @@ window.confirmarPedido = async function() {
 
   const folio = 'KSK-' + Date.now().toString(36).toUpperCase().slice(-6);
   const total = carrito.reduce((s,i) => s + i.precio * i.cantidad, 0);
+  const metodosTexto = { efectivo:'Efectivo al recoger', transferencia:'Transferencia', terminal:'Terminal Mercado Pago', mercadopago:'Link Mercado Pago' };
 
   const pedidoData = {
     folio, nombre, tel, email,
@@ -674,37 +770,63 @@ window.confirmarPedido = async function() {
       nombre: i.nombre, talla: i.talla, color: i.color,
       cantidad: i.cantidad, precio: i.precio, notas: i.notas || ''
     })),
-    canal: 'Quiosco',
-    estado: 'Nuevo',
+    canal: 'Quiosco', estado: 'Nuevo',
     creado: new Date().toISOString()
   };
 
   try {
     await addDoc(collection(db, 'pl_pedidos_kiosco'), pedidoData);
+
+    // Armar mensaje de WhatsApp para el cliente
+    const itemsTexto = carrito.map(i =>
+      `• ${i.nombre} (${i.talla}, ${i.color}) ×${i.cantidad} — $${(i.precio*i.cantidad).toLocaleString('es-MX')}`
+    ).join('\n');
+
+    const msg = `🛍️ *PEDIDO PLAYERAS BELOMA*\n\n` +
+      `📋 Folio: *${folio}*\n` +
+      `👤 Cliente: ${nombre}\n` +
+      `💳 Pago: ${metodosTexto[metodoPago]||metodoPago}\n\n` +
+      `*Artículos:*\n${itemsTexto}\n\n` +
+      `💰 *Total: $${total.toLocaleString('es-MX')}*\n\n` +
+      `📍 Plaza Nájera Local 7, Av. Gutiérrez Nájera #511, Col. Reforma\n` +
+      `📱 WhatsApp: 669 154 9680\n` +
+      `🕐 Lun–Vie 9–17 · Sáb 11–15\n\n` +
+      `¡Gracias por tu pedido! Te contactaremos pronto para confirmar. 🙌`;
+
     document.getElementById('modal-pedido').classList.remove('open');
-    mostrarExito(folio, nombre, tel, metodoPago, total);
+    mostrarExito(folio, nombre, tel, metodoPago, total, msg);
+
   } catch(e) {
     alert('Error al registrar el pedido. Por favor intenta de nuevo.');
   }
 };
 
-function mostrarExito(folio, nombre, tel, metodo, total) {
+function mostrarExito(folio, nombre, tel, metodo, total, msgWs) {
   document.getElementById('exito-folio').textContent = '# ' + folio;
-  const mensajes = {
-    efectivo:     `Hola ${nombre}, te contactaremos al ${tel}\npara coordinar la entrega y el pago en efectivo.`,
-    transferencia:`Hola ${nombre}, te enviaremos los datos de\ntransferencia por WhatsApp al ${tel}.`,
-    mercadopago:  `Hola ${nombre}, recibirás el link de pago\npor WhatsApp al ${tel}.`,
-    tarjeta:      `Hola ${nombre}, te contactaremos al ${tel}\npara coordinar el pago con tarjeta.`
-  };
+  const metodosTexto = { efectivo:'Efectivo al recoger', transferencia:'Transferencia', terminal:'Terminal Mercado Pago', mercadopago:'Link Mercado Pago' };
   document.getElementById('exito-msg').innerHTML =
-    (mensajes[metodo] || mensajes.efectivo).replace(/\n/g, '<br>') +
-    `<br><br><strong>Total: $${total.toLocaleString('es-MX')}</strong>`;
+    `Tu pedido ha sido registrado exitosamente.<br>` +
+    `Método de pago: <strong>${metodosTexto[metodo]||metodo}</strong><br>` +
+    `Total: <strong style="color:var(--green);">$${total.toLocaleString('es-MX')}</strong><br><br>` +
+    `📍 Plaza Nájera Local 7 · 669 154 9680`;
+
+  // Abrir WhatsApp en el teléfono del cliente con el resumen
+  const telLimpio = tel.replace(/[^0-9]/g,'');
+  const telWs = telLimpio.length === 10 ? '52' + telLimpio : telLimpio;
+  const urlWs = `https://wa.me/${telWs}?text=${encodeURIComponent(msgWs)}`;
 
   const exito = document.getElementById('pantalla-exito');
-  exito.style.display = 'flex';
+  // Agregar botón de WhatsApp
+  document.getElementById('ws-btn-wrap').innerHTML = `
+    <a href="${urlWs}" target="_blank"
+      style="display:inline-flex;align-items:center;gap:10px;background:#25D366;color:#fff;
+             padding:16px 32px;border-radius:50px;font-size:17px;font-weight:700;
+             text-decoration:none;margin-bottom:16px;">
+      💬 Enviar resumen a mi WhatsApp
+    </a>`;
 
-  // Auto-reset después de 30 segundos
-  setTimeout(() => nuevoCliente(), 30000);
+  exito.style.display = 'flex';
+  setTimeout(() => nuevoCliente(), 60000); // Reset en 60 seg
 }
 
 window.nuevoCliente = function() {
@@ -716,8 +838,180 @@ window.nuevoCliente = function() {
   document.getElementById('pedido-email').value  = '';
   document.getElementById('pantalla-bienvenida').style.display = 'flex';
   document.getElementById('app').style.display   = 'none';
+  volverInicio();
 };
 
+// ── NAVEGACIÓN INICIO / TODOS ─────────────────────────────
+window.verTodos = function() {
+  document.getElementById('vista-inicio').style.display = 'none';
+  document.getElementById('vista-todos').style.display  = 'flex';
+  renderCatalogo();
+};
+
+window.volverInicio = function() {
+  document.getElementById('vista-todos').style.display  = 'none';
+  document.getElementById('vista-inicio').style.display = 'block';
+};
+
+window.verSeccion = function(tag) {
+  catActual = ''; genActual = '';
+  document.querySelectorAll('[data-cat]').forEach(b => b.classList.toggle('activo', b.dataset.cat===''));
+  document.querySelectorAll('[data-gen]').forEach(b => b.classList.toggle('activo', b.dataset.gen===''));
+  document.getElementById('vista-inicio').style.display = 'none';
+  document.getElementById('vista-todos').style.display  = 'flex';
+  // Filtrar por tag de sección
+  renderCatalogoConTag(tag);
+};
+
+function renderCatalogoConTag(tag) {
+  const wrap = document.getElementById('catalogo-wrap');
+  const etiquetas = JSON.parse(localStorage.getItem('ksk_etiquetas')||'{}');
+  let lista = diseños.filter(d => etiquetas[d.id] === tag);
+  if(lista.length === 0) {
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">🎨</div><p>Sin diseños en esta sección.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = lista.map(d => tarjetaDiseno(d)).join('');
+}
+
+// ── SECCIONES EN INICIO ───────────────────────────────────
+function renderSecciones() {
+  const etiquetas = JSON.parse(localStorage.getItem('ksk_etiquetas')||'{}');
+  const secciones = [
+    { key:'destacado',  gridId:'grid-destacados', emptyId:'empty-destacados' },
+    { key:'nuevo',      gridId:'grid-nuevos',      emptyId:'empty-nuevos' },
+    { key:'mas_vendido',gridId:'grid-vendidos',    emptyId:'empty-vendidos' },
+    { key:'descuento',  gridId:'grid-descuento',   emptyId:'empty-descuento' },
+  ];
+  secciones.forEach(({ key, gridId, emptyId }) => {
+    const lista = diseños.filter(d => etiquetas[d.id] === key).slice(0, 8);
+    const grid  = document.getElementById(gridId);
+    const empty = document.getElementById(emptyId);
+    if(!grid) return;
+    if(lista.length === 0) {
+      grid.innerHTML = '';
+      if(empty) empty.style.display = 'block';
+    } else {
+      if(empty) empty.style.display = 'none';
+      grid.innerHTML = lista.map(d => tarjetaDiseno(d, true)).join('');
+    }
+  });
+}
+
+function tarjetaDiseno(d, pequeña=false) {
+  const etiquetas = JSON.parse(localStorage.getItem('ksk_etiquetas')||'{}');
+  const tag = etiquetas[d.id];
+  const badges = { destacado:'⭐', nuevo:'🆕', mas_vendido:'🔥', descuento:'💥' };
+  return `<div class="diseno-card" onclick="abrirDetalle('${d.id}')">
+    ${tag ? `<div style="position:absolute;top:8px;left:8px;font-size:16px;z-index:1;">${badges[tag]||''}</div>` : ''}
+    <img src="${d.imagen||''}" alt="${d.nombre}"
+      onerror="this.style.background='#333';this.removeAttribute('src')" loading="lazy"
+      style="width:100%;${pequeña?'aspect-ratio:1':'max-height:55vh'};object-fit:cover;">
+    <div class="info">
+      <div class="nombre">${d.nombre}</div>
+      <div class="categoria">${d.categoria||''}</div>
+      <div class="precio">${d.precio?'$'+Number(d.precio).toLocaleString('es-MX'):'Consultar'}</div>
+    </div>
+  </div>`;
+}
+
+// ── BÚSQUEDA RÁPIDA DESDE INICIO ─────────────────────────
+window.buscarRapido = function(q) {
+  if(q.length < 2) return;
+  catActual = ''; genActual = '';
+  document.getElementById('busqueda-todos').value = q;
+  verTodos();
+};
+
+// ── ADMIN QUIOSCO ─────────────────────────────────────────
+let logoTaps = 0; let logoTimer;
+document.querySelector('header img').addEventListener('click', () => {
+  logoTaps++;
+  clearTimeout(logoTimer);
+  logoTimer = setTimeout(() => logoTaps = 0, 2000);
+  if(logoTaps >= 5) { logoTaps = 0; abrirAdminKiosco(); }
+});
+
+function abrirAdminKiosco() {
+  const pass = prompt('Contraseña admin:');
+  if(pass !== 'beloma2024') { alert('Contraseña incorrecta'); return; }
+  document.getElementById('admin-buscar').value = '';
+  document.getElementById('admin-resultados').innerHTML = '<div style="color:var(--ink-soft);font-size:13px;text-align:center;padding:20px;">Escribe para buscar un diseño.</div>';
+  document.getElementById('modal-admin-kiosco').classList.add('open');
+}
+
+window.closeModal = function(id) {
+  document.getElementById(id).classList.remove('open');
+};
+
+window.buscarParaAdmin = function(q) {
+  const cont = document.getElementById('admin-resultados');
+  if(!q || q.length < 2) { cont.innerHTML = '<div style="color:var(--ink-soft);font-size:13px;text-align:center;padding:20px;">Escribe para buscar.</div>'; return; }
+  const etiquetas = JSON.parse(localStorage.getItem('ksk_etiquetas')||'{}');
+  const lista = diseños.filter(d => d.nombre?.toLowerCase().includes(q.toLowerCase())).slice(0, 20);
+  if(!lista.length) { cont.innerHTML = '<div style="color:var(--ink-soft);font-size:13px;text-align:center;padding:20px;">Sin resultados.</div>'; return; }
+  const opciones = [
+    { val:'', label:'Sin etiqueta' },
+    { val:'destacado', label:'⭐ Destacado' },
+    { val:'nuevo', label:'🆕 Nuevo' },
+    { val:'mas_vendido', label:'🔥 Más vendido' },
+    { val:'descuento', label:'💥 Descuento' },
+  ];
+  cont.innerHTML = lista.map(d => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+      <img src="${d.imagen||''}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0;background:#333;">
+      <div style="flex:1;font-size:13px;font-weight:600;">${d.nombre}</div>
+      <select onchange="asignarEtiqueta('${d.id}',this.value)"
+        style="background:var(--dark);border:1.5px solid var(--border);border-radius:8px;
+               padding:6px 10px;color:var(--ink);font-size:12px;font-family:'Inter',sans-serif;outline:none;">
+        ${opciones.map(o=>`<option value="${o.val}" ${etiquetas[d.id]===o.val?'selected':''}>${o.label}</option>`).join('')}
+      </select>
+    </div>`).join('');
+};
+
+window.asignarEtiqueta = function(id, val) {
+  const etiquetas = JSON.parse(localStorage.getItem('ksk_etiquetas')||'{}');
+  if(val === '') delete etiquetas[id];
+  else etiquetas[id] = val;
+  localStorage.setItem('ksk_etiquetas', JSON.stringify(etiquetas));
+  renderSecciones();
+  toastKiosco('✅ Guardado');
+};
+
+function toastKiosco(msg) {
+  const t = document.getElementById('toast-kiosco');
+  if(!t) return;
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 1800);
+}
+
 </script>
+
+<!-- MODAL ADMIN QUIOSCO -->
+<div class="modal-overlay" id="modal-admin-kiosco">
+  <div class="modal" style="max-width:480px;">
+    <button onclick="closeModal('modal-admin-kiosco')" style="position:sticky;top:0;width:100%;
+      background:rgba(30,30,30,0.95);border:none;color:#fff;font-size:16px;font-weight:700;
+      padding:14px;cursor:pointer;display:flex;align-items:center;gap:8px;
+      font-family:'Inter',sans-serif;border-bottom:1px solid rgba(255,255,255,0.1);">
+      ← Cerrar
+    </button>
+    <div class="modal-body">
+      <h2 style="font-size:20px;font-weight:800;margin-bottom:6px;">⚙️ Admin Quiosco</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-bottom:16px;">Busca un diseño y asígnale una sección.</p>
+      <input type="text" id="admin-buscar" placeholder="🔍 Buscar diseño..."
+        oninput="buscarParaAdmin(this.value)"
+        style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:12px;
+               padding:12px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;
+               outline:none;margin-bottom:14px;">
+      <div id="admin-resultados"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-kiosco" style="position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+  background:var(--green);color:#fff;padding:12px 24px;border-radius:50px;font-weight:700;
+  font-size:14px;display:none;z-index:500;"></div>
+
 </body>
 </html>
