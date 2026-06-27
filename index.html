@@ -282,14 +282,17 @@
     background-size: cover; background-position: center; background-color: var(--card);
     transition: transform 0.15s;
   }
+  .tarjeta-inicio.tarjeta-especial {
+    aspect-ratio: 16/9;
+  }
   .tarjeta-inicio:active { transform: scale(0.97); }
-  .tarjeta-inicio:hover .tarjeta-overlay { background: rgba(0,0,0,0.55); }
+  .tarjeta-inicio:hover .tarjeta-overlay { background: rgba(0,0,0,0.2); }
   .tarjeta-overlay {
     position: absolute; inset: 0;
-    background: rgba(0,0,0,0.45);
+    background: rgba(0,0,0,0.15);
     display: flex; align-items: flex-end;
     padding: 14px; font-size: 15px; font-weight: 800;
-    color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.9);
     transition: background 0.2s;
   }
 
@@ -424,19 +427,19 @@
     <div style="font-size:13px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;
                 letter-spacing:0.08em;margin-bottom:12px;">✨ Colecciones especiales</div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px;">
-      <div class="tarjeta-inicio" onclick="verSeccion('destacado')"
+      <div class="tarjeta-inicio tarjeta-especial" onclick="verSeccion('destacado')"
         style="background-image:url('img/destacados.jpg')">
         <div class="tarjeta-overlay">⭐ Destacados</div>
       </div>
-      <div class="tarjeta-inicio" onclick="verSeccion('nuevo')"
+      <div class="tarjeta-inicio tarjeta-especial" onclick="verSeccion('nuevo')"
         style="background-image:url('img/nuevos.jpg')">
         <div class="tarjeta-overlay">🆕 Nuevos</div>
       </div>
-      <div class="tarjeta-inicio" onclick="verSeccion('mas_vendido')"
+      <div class="tarjeta-inicio tarjeta-especial" onclick="verSeccion('mas_vendido')"
         style="background-image:url('img/mas-vendidos.jpg')">
         <div class="tarjeta-overlay">🔥 Más vendidos</div>
       </div>
-      <div class="tarjeta-inicio" onclick="verSeccion('descuento')"
+      <div class="tarjeta-inicio tarjeta-especial" onclick="verSeccion('descuento')"
         style="background-image:url('img/descuentos.jpg')">
         <div class="tarjeta-overlay">💥 Descuentos</div>
       </div>
