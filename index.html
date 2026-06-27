@@ -275,7 +275,27 @@
     text-align: center; z-index: 400; display: none;
   }
 
-  /* ── RESPONSIVE MÓVIL ── */
+  /* ── TARJETAS DE INICIO ── */
+  .tarjeta-inicio {
+    position: relative; border-radius: 16px; overflow: hidden;
+    aspect-ratio: 1; cursor: pointer;
+    background-size: cover; background-position: center; background-color: var(--card);
+    transition: transform 0.15s;
+  }
+  .tarjeta-inicio:active { transform: scale(0.97); }
+  .tarjeta-inicio:hover .tarjeta-overlay { background: rgba(0,0,0,0.55); }
+  .tarjeta-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex; align-items: flex-end;
+    padding: 14px; font-size: 15px; font-weight: 800;
+    color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    transition: background 0.2s;
+  }
+
+  @media (max-width: 600px) {
+    .tarjeta-overlay { font-size: 13px; padding: 10px; }
+  }
   @media (max-width: 600px) {
     /* Header compacto */
     header { padding: 10px 14px; }
@@ -400,44 +420,84 @@
       </button>
     </div>
 
-    <!-- Sección: Destacados -->
-    <div id="sec-destacados" style="margin-bottom:32px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <div style="font-size:20px;font-weight:800;">⭐ Destacados</div>
-        <button onclick="verSeccion('destacado')" style="font-size:13px;color:var(--green);background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;">Ver todos →</button>
+    <!-- Secciones especiales -->
+    <div style="font-size:13px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;
+                letter-spacing:0.08em;margin-bottom:12px;">✨ Colecciones especiales</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px;">
+      <div class="tarjeta-inicio" onclick="verSeccion('destacado')"
+        style="background-image:url('img/destacados.jpg')">
+        <div class="tarjeta-overlay">⭐ Destacados</div>
       </div>
-      <div id="grid-destacados" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;"></div>
-      <div id="empty-destacados" style="display:none;color:var(--ink-soft);font-size:14px;padding:20px 0;">Sin diseños destacados aún.</div>
+      <div class="tarjeta-inicio" onclick="verSeccion('nuevo')"
+        style="background-image:url('img/nuevos.jpg')">
+        <div class="tarjeta-overlay">🆕 Nuevos</div>
+      </div>
+      <div class="tarjeta-inicio" onclick="verSeccion('mas_vendido')"
+        style="background-image:url('img/mas-vendidos.jpg')">
+        <div class="tarjeta-overlay">🔥 Más vendidos</div>
+      </div>
+      <div class="tarjeta-inicio" onclick="verSeccion('descuento')"
+        style="background-image:url('img/descuentos.jpg')">
+        <div class="tarjeta-overlay">💥 Descuentos</div>
+      </div>
     </div>
 
-    <!-- Sección: Nuevos -->
-    <div id="sec-nuevos" style="margin-bottom:32px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <div style="font-size:20px;font-weight:800;">🆕 Nuevos diseños</div>
-        <button onclick="verSeccion('nuevo')" style="font-size:13px;color:var(--green);background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;">Ver todos →</button>
+    <!-- Categorías -->
+    <div style="font-size:13px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;
+                letter-spacing:0.08em;margin-bottom:12px;">🎨 Explorar por categoría</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
+      <div class="tarjeta-inicio" onclick="verCategoria('Anime')"
+        style="background-image:url('img/anime.png')">
+        <div class="tarjeta-overlay">Anime</div>
       </div>
-      <div id="grid-nuevos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;"></div>
-      <div id="empty-nuevos" style="display:none;color:var(--ink-soft);font-size:14px;padding:20px 0;">Sin diseños nuevos aún.</div>
-    </div>
-
-    <!-- Sección: Más vendidos -->
-    <div id="sec-vendidos" style="margin-bottom:32px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <div style="font-size:20px;font-weight:800;">🔥 Más vendidos</div>
-        <button onclick="verSeccion('mas_vendido')" style="font-size:13px;color:var(--green);background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;">Ver todos →</button>
+      <div class="tarjeta-inicio" onclick="verCategoria('Caricaturas Actuales')"
+        style="background-image:url('img/caricaturas-actuales.png')">
+        <div class="tarjeta-overlay">Caricaturas Actuales</div>
       </div>
-      <div id="grid-vendidos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;"></div>
-      <div id="empty-vendidos" style="display:none;color:var(--ink-soft);font-size:14px;padding:20px 0;">Sin diseños marcados aún.</div>
-    </div>
-
-    <!-- Sección: En descuento -->
-    <div id="sec-descuento" style="margin-bottom:32px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <div style="font-size:20px;font-weight:800;">💥 En descuento</div>
-        <button onclick="verSeccion('descuento')" style="font-size:13px;color:var(--green);background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;">Ver todos →</button>
+      <div class="tarjeta-inicio" onclick="verCategoria('Caricaturas Retro')"
+        style="background-image:url('img/caricaturas-retro.png')">
+        <div class="tarjeta-overlay">Caricaturas Retro</div>
       </div>
-      <div id="grid-descuento" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;"></div>
-      <div id="empty-descuento" style="display:none;color:var(--ink-soft);font-size:14px;padding:20px 0;">Sin diseños en descuento aún.</div>
+      <div class="tarjeta-inicio" onclick="verCategoria('Deportes')"
+        style="background-image:url('img/deportes.png')">
+        <div class="tarjeta-overlay">Deportes</div>
+      </div>
+      <div class="tarjeta-inicio" onclick="verCategoria('Diseños')"
+        style="background-image:url('img/disenos.png')">
+        <div class="tarjeta-overlay">Diseños</div>
+      </div>
+      <div class="tarjeta-inicio" onclick="verCategoria('Grupos Musicales')"
+        style="background-image:url('img/grupos-musicales.png')">
+        <div class="tarjeta-overlay">Grupos Musicales</div>
+      </div>
+      <div class="tarjeta-inicio" onclick="verCategoria('Juguetes & Juegos')"
+        style="background-image:url('img/juguetes-juegos.png')">
+        <div class="tarjeta-overlay">Juguetes & Juegos</div>
+      </div>
+      <div class="tarjeta-inicio" onclick="verCategoria('Libros, Revistas y Comics')"
+        style="background-image:url('img/libros-revistas-comics.png')">
+        <div class="tarjeta-overlay">Libros & Comics</div>
+      </div>
+      <div class="tarjeta-inicio" onclick="verCategoria('Películas')"
+        style="background-image:url('img/peliculas.png')">
+        <div class="tarjeta-overlay">Películas</div>
+      </div>
+      <div class="tarjeta-inicio" onclick="verCategoria('Personajes')"
+        style="background-image:url('img/personajes.png')">
+        <div class="tarjeta-overlay">Personajes</div>
+      </div>
+      <div class="tarjeta-inicio" onclick="verCategoria('Series')"
+        style="background-image:url('img/series.png')">
+        <div class="tarjeta-overlay">Series</div>
+      </div>
+      <div class="tarjeta-inicio" onclick="verCategoria('Superhéroes')"
+        style="background-image:url('img/superheroes.png')">
+        <div class="tarjeta-overlay">Superhéroes</div>
+      </div>
+      <div class="tarjeta-inicio" onclick="verCategoria('Videojuegos')"
+        style="background-image:url('img/videojuegos.png')">
+        <div class="tarjeta-overlay">Videojuegos</div>
+      </div>
     </div>
   </div>
 
@@ -1007,6 +1067,16 @@ window.nuevoCliente = function() {
 };
 
 // ── NAVEGACIÓN INICIO / TODOS ─────────────────────────────
+window.verCategoria = function(cat) {
+  catActual = cat; genActual = '';
+  document.getElementById('vista-inicio').style.display = 'none';
+  document.getElementById('vista-todos').style.display  = 'flex';
+  // Actualizar filtro activo
+  document.querySelectorAll('[data-cat]').forEach(b => b.classList.toggle('activo', b.dataset.cat===cat));
+  document.querySelectorAll('[data-gen]').forEach(b => b.classList.toggle('activo', b.dataset.gen===''));
+  renderCatalogo();
+};
+
 window.verTodos = function() {
   document.getElementById('vista-inicio').style.display = 'none';
   document.getElementById('vista-todos').style.display  = 'flex';
