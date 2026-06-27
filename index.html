@@ -274,6 +274,88 @@
     padding: 10px 20px; font-size: 13px; color: var(--ink-soft);
     text-align: center; z-index: 400; display: none;
   }
+
+  /* ── RESPONSIVE MÓVIL ── */
+  @media (max-width: 600px) {
+    /* Header compacto */
+    header { padding: 10px 14px; }
+    header img { height: 32px !important; }
+    .header-carrito { padding: 10px 14px; font-size: 13px; gap: 6px; }
+
+    /* Pantalla bienvenida */
+    #pantalla-bienvenida img { width: 85vw !important; }
+    #pantalla-bienvenida .toca { font-size: 16px; padding: 16px 32px; }
+
+    /* Vista inicio */
+    #vista-inicio { padding: 14px 14px; }
+    #vista-inicio > div:first-child { flex-direction: column; gap: 8px; }
+    #busqueda-rapida { font-size: 14px; padding: 12px 16px; }
+    #vista-inicio > div:first-child button { width: 100%; }
+
+    /* Secciones */
+    #sec-destacados, #sec-nuevos, #sec-vendidos, #sec-descuento { margin-bottom: 24px; }
+    #grid-destacados, #grid-nuevos, #grid-vendidos, #grid-descuento {
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 10px !important;
+    }
+
+    /* Vista todos */
+    #catalogo-wrap {
+      padding: 12px 12px;
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 10px !important;
+    }
+
+    /* Cards */
+    .diseno-card .nombre { font-size: 12px; }
+    .diseno-card .precio { font-size: 14px; }
+    .diseno-card .info { padding: 8px 10px; }
+
+    /* Filtros */
+    .filtros { padding: 10px 14px; gap: 8px; }
+    .filtro-btn { padding: 8px 14px; font-size: 13px; }
+
+    /* Modal — ocupa toda la pantalla en móvil */
+    .modal-overlay { padding: 0 !important; align-items: flex-end !important; }
+    .modal {
+      border-radius: 20px 20px 0 0 !important;
+      max-width: 100% !important;
+      max-height: 92vh !important;
+    }
+    .modal-img { max-height: 40vh !important; border-radius: 20px 20px 0 0 !important; }
+    .modal-body { padding: 16px 18px 24px !important; }
+    .modal-nombre { font-size: 18px !important; }
+    .modal-precio { font-size: 26px !important; margin-bottom: 14px !important; }
+    .opcion-btn { padding: 10px 14px; font-size: 13px; }
+    .cant-btn { width: 48px; height: 48px; font-size: 22px; }
+    #modal-cant-val { font-size: 22px; }
+    .btn-agregar { font-size: 15px; padding: 14px; }
+    .btn-cerrar-modal { font-size: 14px; padding: 14px 16px; }
+
+    /* Carrito */
+    .carrito-item img { width: 50px; height: 50px; }
+    .carrito-item-nombre { font-size: 13px; }
+    .carrito-total { font-size: 16px; }
+    .carrito-total span:last-child { font-size: 20px; }
+    .btn-pagar { font-size: 16px; padding: 16px; }
+
+    /* Pedido */
+    .pedido-input { font-size: 16px; padding: 13px 14px; }
+    .metodo-pago-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .metodo-btn { padding: 12px 8px; font-size: 12px; }
+    .metodo-btn .metodo-icon { font-size: 20px; }
+
+    /* Éxito */
+    #pantalla-exito { padding: 24px 20px; }
+    #pantalla-exito .check { font-size: 70px; margin-bottom: 16px; }
+    #pantalla-exito h1 { font-size: 26px; }
+    #pantalla-exito p { font-size: 15px; margin-bottom: 24px; }
+    #pantalla-exito .folio { font-size: 22px; }
+
+    /* Vista todos barra superior */
+    #vista-todos > div:first-child { padding: 10px 14px; }
+    #busqueda-todos { font-size: 14px; padding: 8px 14px; }
+  }
 </style>
 </head>
 <body>
@@ -752,6 +834,49 @@ window.selMetodo = function(btn) {
   document.getElementById('mp-panel').style.display = metodoPago === 'mercadopago' ? 'block' : 'none';
 };
 
+// ── MERCADO PAGO CHECKOUT PRO ────────────────────────────
+const MP_ACCESS_TOKEN = 'APP_USR-891421796666480-062712-bf4cfcaabeac13eeaa7d23903d2cbb15-27029173';
+const MP_PUBLIC_KEY   = 'APP_USR-506bdf18-23bb-4980-bd83-1225fdaa065f';
+
+async function crearPreferenciaMercadoPago(folio, nombre, email, total, items) {
+  try {
+    const preference = {
+      items: items.map(i => ({
+        title: `${i.nombre} (Talla ${i.talla}, ${i.color})`,
+        quantity: i.cantidad,
+        unit_price: +i.precio || 1,
+        currency_id: 'MXN'
+      })),
+      payer: { name: nombre, email: email || 'cliente@beloma.mx' },
+      external_reference: folio,
+      back_urls: {
+        success: `https://adminbeloma.github.io/kiosco/?pago=exitoso&folio=${folio}`,
+        failure: `https://adminbeloma.github.io/kiosco/?pago=fallido&folio=${folio}`,
+        pending: `https://adminbeloma.github.io/kiosco/?pago=pendiente&folio=${folio}`
+      },
+      auto_return: 'approved',
+      statement_descriptor: 'Playeras Beloma',
+      notification_url: 'https://adminbeloma.github.io/kiosco/'
+    };
+
+    const resp = await fetch('https://api.mercadopago.com/checkout/preferences', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${MP_ACCESS_TOKEN}`
+      },
+      body: JSON.stringify(preference)
+    });
+
+    if(!resp.ok) throw new Error('Error MP: ' + resp.status);
+    const data = await resp.json();
+    return data.init_point; // URL de pago real
+  } catch(e) {
+    console.error('Error Mercado Pago:', e);
+    return null;
+  }
+}
+
 window.confirmarPedido = async function() {
   const nombre = document.getElementById('pedido-nombre').value.trim();
   const tel    = document.getElementById('pedido-tel').value.trim();
@@ -770,36 +895,76 @@ window.confirmarPedido = async function() {
       nombre: i.nombre, talla: i.talla, color: i.color,
       cantidad: i.cantidad, precio: i.precio, notas: i.notas || ''
     })),
-    canal: 'Quiosco', estado: 'Nuevo',
+    canal: 'Quiosco', estado: metodoPago === 'mercadopago' ? 'Pago pendiente' : 'Nuevo',
     creado: new Date().toISOString()
   };
+
+  // Deshabilitar botón mientras procesa
+  const btnConfirmar = document.getElementById('btn-confirmar-pedido');
+  btnConfirmar.disabled = true;
+  btnConfirmar.textContent = '⏳ Procesando...';
 
   try {
     await addDoc(collection(db, 'pl_pedidos_kiosco'), pedidoData);
 
-    // Armar mensaje de WhatsApp para el cliente
+    // Si es Mercado Pago → generar link de pago
+    if(metodoPago === 'mercadopago') {
+      const mpUrl = await crearPreferenciaMercadoPago(folio, nombre, email, total, pedidoData.items);
+      btnConfirmar.disabled = false;
+      btnConfirmar.textContent = '✅ Confirmar pedido';
+
+      if(mpUrl) {
+        document.getElementById('modal-pedido').classList.remove('open');
+        // Mostrar pantalla de redireccion a MP
+        mostrarRedirectMP(folio, nombre, tel, total, mpUrl);
+        return;
+      } else {
+        alert('No se pudo generar el link de pago. Por favor selecciona otro método.');
+        return;
+      }
+    }
+
+    // Armar mensaje de WhatsApp
     const itemsTexto = carrito.map(i =>
       `• ${i.nombre} (${i.talla}, ${i.color}) ×${i.cantidad} — $${(i.precio*i.cantidad).toLocaleString('es-MX')}`
     ).join('\n');
-
     const msg = `🛍️ *PEDIDO PLAYERAS BELOMA*\n\n` +
-      `📋 Folio: *${folio}*\n` +
-      `👤 Cliente: ${nombre}\n` +
-      `💳 Pago: ${metodosTexto[metodoPago]||metodoPago}\n\n` +
-      `*Artículos:*\n${itemsTexto}\n\n` +
-      `💰 *Total: $${total.toLocaleString('es-MX')}*\n\n` +
+      `📋 Folio: *${folio}*\n👤 Cliente: ${nombre}\n💳 Pago: ${metodosTexto[metodoPago]||metodoPago}\n\n` +
+      `*Artículos:*\n${itemsTexto}\n\n💰 *Total: $${total.toLocaleString('es-MX')}*\n\n` +
       `📍 Plaza Nájera Local 7, Av. Gutiérrez Nájera #511, Col. Reforma\n` +
-      `📱 WhatsApp: 669 154 9680\n` +
-      `🕐 Lun–Vie 9–17 · Sáb 11–15\n\n` +
+      `📱 WhatsApp: 669 154 9680\n🕐 Lun–Vie 9–17 · Sáb 11–15\n\n` +
       `¡Gracias por tu pedido! Te contactaremos pronto para confirmar. 🙌`;
 
+    btnConfirmar.disabled = false;
+    btnConfirmar.textContent = '✅ Confirmar pedido';
     document.getElementById('modal-pedido').classList.remove('open');
     mostrarExito(folio, nombre, tel, metodoPago, total, msg);
 
   } catch(e) {
+    btnConfirmar.disabled = false;
+    btnConfirmar.textContent = '✅ Confirmar pedido';
     alert('Error al registrar el pedido. Por favor intenta de nuevo.');
   }
 };
+
+function mostrarRedirectMP(folio, nombre, tel, total, mpUrl) {
+  // Mostrar pantalla de redirección a Mercado Pago
+  const exito = document.getElementById('pantalla-exito');
+  document.getElementById('exito-folio').textContent = '# ' + folio;
+  document.getElementById('exito-msg').innerHTML =
+    `Serás redirigido a Mercado Pago para completar tu pago.<br>` +
+    `<strong style="color:var(--green);">Total: $${total.toLocaleString('es-MX')}</strong><br><br>` +
+    `📱 Guarda tu folio para cualquier aclaración`;
+  document.getElementById('ws-btn-wrap').innerHTML = `
+    <a href="${mpUrl}" target="_blank"
+      style="display:inline-flex;align-items:center;gap:10px;background:#009EE3;color:#fff;
+             padding:16px 32px;border-radius:50px;font-size:17px;font-weight:700;
+             text-decoration:none;margin-bottom:16px;">
+      💳 Pagar con Mercado Pago
+    </a>`;
+  exito.style.display = 'flex';
+  setTimeout(() => nuevoCliente(), 120000); // Reset en 2 minutos
+}
 
 function mostrarExito(folio, nombre, tel, metodo, total, msgWs) {
   document.getElementById('exito-folio').textContent = '# ' + folio;
