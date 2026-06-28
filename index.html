@@ -525,11 +525,14 @@
           style="flex:1;background:var(--card);border:2px solid var(--border);border-radius:50px;
                  padding:10px 16px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;">
       </div>
-      <div class="filtros" style="padding:0;background:none;border:none;overflow-x:auto;">
-        <button class="filtro-btn activo" data-cat="" onclick="filtrarCat(this,'')">✨ Todos</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <span style="font-size:11px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Categoría:</span>
+        <button class="filtro-btn activo" data-cat="" onclick="filtrarCat(this,'')">✨ Todas</button>
         <div class="filtro-sep"></div>
         <div id="filtros-cats" style="display:contents;"></div>
-        <div class="filtro-sep"></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+        <span style="font-size:11px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Género:</span>
         <button class="filtro-btn activo" data-gen="" onclick="filtrarGen(this,'')">👥 Todos</button>
         <button class="filtro-btn" data-gen="Hombre" onclick="filtrarGen(this,'Hombre')">👨 Hombre</button>
         <button class="filtro-btn" data-gen="Mujer" onclick="filtrarGen(this,'Mujer')">👩 Mujer</button>
