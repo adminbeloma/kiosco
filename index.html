@@ -1512,6 +1512,157 @@ function actualizarBtnCuenta() {
   }
 }
 
+// ── CARGA MASIVA QUIOSCO ──────────────────────────────────
+let kskItems = [];
+
+window.kskDragOver = function(e) {
+  e.preventDefault();
+  const dz = document.getElementById('ksk-dropzone');
+  dz.style.borderColor = 'var(--green)';
+  dz.style.background  = 'rgba(106,171,31,0.05)';
+};
+window.kskDragLeave = function(e) {
+  const dz = document.getElementById('ksk-dropzone');
+  dz.style.borderColor = 'var(--border)';
+  dz.style.background  = '';
+};
+window.kskDrop = function(e) {
+  e.preventDefault();
+  kskDragLeave(e);
+  kskArchivosSeleccionados(e.dataTransfer.files);
+};
+
+window.kskArchivosSeleccionados = function(files) {
+  const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+  if(!arr.length) { toastKiosco('⚠️ Solo imágenes'); return; }
+  if(arr.length > 30) { toastKiosco('⚠️ Máximo 30 a la vez'); return; }
+  arr.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      kskItems.push({
+        id: 'tmp-' + Date.now() + Math.random(),
+        file,
+        previewUrl: e.target.result,
+        nombre: file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '),
+        categoria: document.getElementById('ksk-g-categoria').value || '',
+        precio: document.getElementById('ksk-g-precio').value || '',
+        genero: document.getElementById('ksk-g-genero').value || '',
+        color: document.getElementById('ksk-g-color').value || ''
+      });
+      kskRenderGrid();
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('ksk-ajustes-globales').style.display = 'block';
+  document.getElementById('ksk-save-bar').style.display = 'block';
+};
+
+function kskRenderGrid() {
+  const grid = document.getElementById('ksk-preview-grid');
+  grid.innerHTML = kskItems.map(item => `
+    <div style="background:var(--card);border-radius:10px;overflow:hidden;position:relative;">
+      <button onclick="kskEliminarItem('${item.id}')"
+        style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;
+               border:none;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;">×</button>
+      <img src="${item.previewUrl}" style="width:100%;aspect-ratio:1;object-fit:cover;">
+      <div style="padding:8px;">
+        <input type="text" value="${item.nombre}" placeholder="Nombre *"
+          oninput="kskUpdateItem('${item.id}','nombre',this.value)"
+          style="width:100%;background:var(--dark);border:1px solid var(--border);border-radius:6px;
+                 padding:5px 8px;font-size:11px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;margin-bottom:4px;">
+        <input type="text" value="${item.categoria}" placeholder="Categoría"
+          oninput="kskUpdateItem('${item.id}','categoria',this.value)"
+          style="width:100%;background:var(--dark);border:1px solid var(--border);border-radius:6px;
+                 padding:5px 8px;font-size:11px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;margin-bottom:4px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+          <input type="number" value="${item.precio}" placeholder="Precio"
+            oninput="kskUpdateItem('${item.id}','precio',this.value)"
+            style="background:var(--dark);border:1px solid var(--border);border-radius:6px;
+                   padding:5px 8px;font-size:11px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
+          <input type="text" value="${item.color}" placeholder="Color"
+            oninput="kskUpdateItem('${item.id}','color',this.value)"
+            style="background:var(--dark);border:1px solid var(--border);border-radius:6px;
+                   padding:5px 8px;font-size:11px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+window.kskUpdateItem = function(id, campo, valor) {
+  const item = kskItems.find(x => x.id === id);
+  if(item) item[campo] = valor;
+};
+
+window.kskEliminarItem = function(id) {
+  kskItems = kskItems.filter(x => x.id !== id);
+  if(!kskItems.length) {
+    document.getElementById('ksk-ajustes-globales').style.display = 'none';
+    document.getElementById('ksk-save-bar').style.display = 'none';
+  }
+  kskRenderGrid();
+};
+
+window.kskAplicarGlobal = function(campo, valor) {
+  kskItems.forEach(item => item[campo] = valor);
+  kskRenderGrid();
+};
+
+window.kskGuardarTodo = async function() {
+  const sinNombre = kskItems.filter(x => !x.nombre.trim());
+  if(sinNombre.length) { toastKiosco(`⚠️ ${sinNombre.length} diseño(s) sin nombre`); return; }
+  if(!kskItems.length) { toastKiosco('⚠️ No hay imágenes'); return; }
+
+  const btn = document.getElementById('ksk-btn-guardar');
+  const progBar = document.getElementById('ksk-prog-bar');
+  const progTxt = document.getElementById('ksk-prog-texto');
+  btn.disabled = true;
+  btn.textContent = '⏳ Guardando...';
+
+  let guardados = 0; let errores = 0;
+
+  for(let i = 0; i < kskItems.length; i++) {
+    const item = kskItems[i];
+    progTxt.textContent = `Subiendo ${i+1} de ${kskItems.length}: ${item.nombre}`;
+    progBar.style.width = `${Math.round((i/kskItems.length)*100)}%`;
+    try {
+      const fd = new FormData();
+      fd.append('file', item.file);
+      fd.append('upload_preset', PRESET_KSK);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_KSK}/image/upload`, {method:'POST',body:fd});
+      const data = await res.json();
+      if(data.error) throw new Error(data.error.message);
+      await addDoc(collection(db,'ksk_disenos'), {
+        id: 'ksk-'+Date.now(),
+        nombre: item.nombre.trim(),
+        categoria: item.categoria || '',
+        precio: +item.precio || 0,
+        genero: item.genero || '',
+        color: item.color || '',
+        imagen: data.secure_url,
+        activo: true,
+        creado: new Date().toISOString()
+      });
+      guardados++;
+    } catch(e) { errores++; console.error(e); }
+  }
+
+  progBar.style.width = '100%';
+  progTxt.textContent = `✅ ${guardados} guardados${errores?`, ${errores} con error`:''}`;
+  btn.disabled = false;
+  btn.textContent = '✅ Guardar todos los diseños';
+
+  setTimeout(() => {
+    kskItems = [];
+    kskRenderGrid();
+    document.getElementById('ksk-ajustes-globales').style.display = 'none';
+    document.getElementById('ksk-save-bar').style.display = 'none';
+    document.getElementById('ksk-file-input').value = '';
+    progBar.style.width = '0%';
+    progTxt.textContent = '';
+    toastKiosco(`✅ ${guardados} diseño${guardados!==1?'s':''} agregado${guardados!==1?'s':''}`);
+  }, 1500);
+};
+
 // ── ADMIN QUIOSCO — GESTIÓN DE DISEÑOS ───────────────────
 const CLOUD_KSK = 'dwabl0eti';
 const PRESET_KSK = 'seguro_ahorras';
@@ -1634,21 +1785,54 @@ window.eliminarDisenoKiosco = async function(id) {
       </div>
       <!-- Tab Agregar -->
       <div id="atab-agregar">
-        <input type="text" id="aksk-nombre" placeholder="Nombre del diseño *" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;margin-bottom:10px;">
-        <input type="text" id="aksk-categoria" placeholder="Categoría *" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;margin-bottom:10px;">
-        <input type="number" id="aksk-precio" placeholder="Precio ($) *" step="0.01" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;margin-bottom:10px;">
-        <select id="aksk-genero" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;margin-bottom:10px;">
-          <option value="">— Género —</option>
-          <option value="Hombre">Hombre</option><option value="Mujer">Mujer</option>
-          <option value="Niño">Niño</option><option value="Juvenil">Juvenil</option>
-          <option value="Bebé">Bebé</option><option value="Bebé Pañalero">Bebé Pañalero</option>
-        </select>
-        <input type="text" id="aksk-color" placeholder="Color de playera (ej. Blanca)" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;margin-bottom:10px;">
-        <label style="font-size:13px;color:var(--ink-soft);display:block;margin-bottom:6px;">📷 Imagen</label>
-        <input type="file" id="aksk-imagen" accept="image/*" onchange="previewAksk(this)" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--ink);font-size:13px;outline:none;margin-bottom:10px;">
-        <div id="aksk-preview" style="display:none;margin-bottom:12px;"><img id="aksk-preview-img" style="width:100%;max-height:180px;object-fit:contain;border-radius:10px;background:#333;"></div>
-        <div id="aksk-prog" style="display:none;font-size:13px;color:var(--ink-soft);margin-bottom:10px;text-align:center;">⏳ Subiendo...</div>
-        <button onclick="guardarDisenoKiosco()" style="width:100%;background:var(--green);color:#fff;border:none;padding:14px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;">✅ Guardar diseño</button>
+        <!-- Zona de drop masivo -->
+        <div id="ksk-dropzone" onclick="document.getElementById('ksk-file-input').click()"
+          ondragover="kskDragOver(event)" ondragleave="kskDragLeave(event)" ondrop="kskDrop(event)"
+          style="border:2px dashed var(--border);border-radius:12px;padding:28px 16px;
+                 text-align:center;cursor:pointer;margin-bottom:14px;transition:all 0.2s;">
+          <div style="font-size:32px;margin-bottom:8px;">🖼️</div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:4px;">Arrastra las imágenes aquí</div>
+          <div style="font-size:12px;color:var(--ink-soft);">o toca para seleccionar · Máx. 30 a la vez</div>
+          <input type="file" id="ksk-file-input" accept="image/*" multiple style="display:none"
+            onchange="kskArchivosSeleccionados(this.files)">
+        </div>
+
+        <!-- Ajustes globales -->
+        <div id="ksk-ajustes-globales" style="display:none;background:var(--dark);border-radius:10px;padding:12px;margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">⚡ Aplicar a todas</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <input type="text" id="ksk-g-categoria" placeholder="Categoría" oninput="kskAplicarGlobal('categoria',this.value)"
+              style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
+            <input type="number" id="ksk-g-precio" placeholder="Precio $" oninput="kskAplicarGlobal('precio',this.value)"
+              style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
+            <select id="ksk-g-genero" onchange="kskAplicarGlobal('genero',this.value)"
+              style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
+              <option value="">— Género —</option>
+              <option value="Hombre">Hombre</option><option value="Mujer">Mujer</option>
+              <option value="Niño">Niño</option><option value="Juvenil">Juvenil</option>
+              <option value="Bebé">Bebé</option><option value="Bebé Pañalero">Bebé Pañalero</option>
+            </select>
+            <input type="text" id="ksk-g-color" placeholder="Color playera" oninput="kskAplicarGlobal('color',this.value)"
+              style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
+          </div>
+          <div style="font-size:11px;color:var(--ink-soft);">💡 Ajusta individualmente en cada imagen abajo</div>
+        </div>
+
+        <!-- Grid de imágenes -->
+        <div id="ksk-preview-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:380px;overflow-y:auto;margin-bottom:12px;"></div>
+
+        <!-- Barra de guardado -->
+        <div id="ksk-save-bar" style="display:none;">
+          <div id="ksk-prog-texto" style="font-size:13px;color:var(--ink-soft);margin-bottom:6px;text-align:center;"></div>
+          <div style="background:var(--border);border-radius:10px;height:6px;overflow:hidden;margin-bottom:10px;">
+            <div id="ksk-prog-bar" style="height:100%;background:var(--green);border-radius:10px;width:0%;transition:width 0.3s;"></div>
+          </div>
+          <button id="ksk-btn-guardar" onclick="kskGuardarTodo()"
+            style="width:100%;background:var(--green);color:#fff;border:none;padding:14px;
+                   border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;">
+            ✅ Guardar todos los diseños
+          </button>
+        </div>
       </div>
       <!-- Tab Gestionar -->
       <div id="atab-gestionar" style="display:none;">
