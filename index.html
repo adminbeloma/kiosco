@@ -447,18 +447,6 @@
       </div>
     </div>
 
-    <!-- Diseño Personalizado -->
-    <div style="font-size:13px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;
-                letter-spacing:0.08em;margin-bottom:12px;margin-top:8px;">✏️ ¿Tienes tu propio diseño?</div>
-    <div class="tarjeta-inicio tarjeta-especial" onclick="abrirDisenoPersonalizado()"
-      style="background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);
-             border:2px solid var(--green);margin-bottom:24px;">
-      <div class="tarjeta-overlay" style="background:rgba(0,0,0,0.3);flex-direction:column;
-           align-items:flex-start;justify-content:flex-end;gap:4px;">
-        <div style="font-size:20px;font-weight:900;">✏️ Diseño Personalizado</div>
-        <div style="font-size:13px;font-weight:400;opacity:0.85;">Elige género, talla y color — manda tu diseño por WhatsApp</div>
-      </div>
-    </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
       <div class="tarjeta-inicio" onclick="verCategoria('Anime')"
         style="background-image:url('img/anime.jpg')">
@@ -511,6 +499,15 @@
       <div class="tarjeta-inicio" onclick="verCategoria('Videojuegos')"
         style="background-image:url('img/videojuegos.jpg')">
         <div class="tarjeta-overlay">Videojuegos</div>
+      </div>
+      <!-- Tu Diseño Personalizado -->
+      <div class="tarjeta-inicio" onclick="abrirDisenoPersonalizado()"
+        style="background-image:url('img/personalizada.jpg');border:2px solid var(--green);">
+        <div class="tarjeta-overlay" style="background:rgba(0,0,0,0.2);flex-direction:column;
+             align-items:center;justify-content:center;text-align:center;gap:6px;">
+          <div style="font-size:28px;">✏️</div>
+          <div style="font-size:14px;font-weight:800;">Tu Diseño</div>
+        </div>
       </div>
     </div>
   </div>
