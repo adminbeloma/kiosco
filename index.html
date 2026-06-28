@@ -545,8 +545,8 @@
 </div>
 
 <!-- MODAL DETALLE DISEÑO -->
-<div class="modal-overlay" id="modal-detalle" onclick="cerrarDetalleOverlay(event)">
-  <div class="modal" style="position:relative;">
+<div class="modal-overlay" id="modal-detalle">
+  <div class="modal" style="position:relative;max-height:90vh;overflow-y:auto;">
     <!-- Botón X siempre visible arriba -->
     <button onclick="cerrarDetalle()" style="position:sticky;top:0;left:0;right:0;z-index:10;
       width:100%;background:rgba(30,30,30,0.95);border:none;color:#fff;
@@ -685,7 +685,7 @@
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, addDoc, getDocs, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAvhG8RuytIv9rjsILWF8twyZeqTwfJ10I",
@@ -708,9 +708,9 @@ let diseñoActual = null;
 let cantActual   = 1;
 let metodoPago   = 'efectivo';
 
-// ── CARGAR DISEÑOS DESDE FIREBASE ─────────────────────────
-onSnapshot(collection(db, 'bl_disenos'), snap => {
-  diseños = snap.docs.map(d => d.data()).filter(d => d.activo);
+// ── CARGAR DISEÑOS DESDE FIREBASE (colección propia del quiosco) ──
+onSnapshot(collection(db, 'ksk_disenos'), snap => {
+  diseños = snap.docs.map(d => d.data()).filter(d => d.activo !== false);
   renderCatalogo();
   renderFiltrosCats();
   renderSecciones();
@@ -1435,7 +1435,13 @@ window.abrirMiCuenta = function() {
   document.getElementById('modal-mi-cuenta').classList.add('open');
 };
 
-window.cerrarCuentaOverlay = function(e) {
+window.cerrarPersonalizadoConConfirm = function() {
+  document.getElementById('modal-confirm-personalizado').classList.add('open');
+};
+window.confirmarCierrePersonalizado = function() {
+  closeModal('modal-confirm-personalizado');
+  closeModal('modal-personalizado');
+};
   if(e.target === document.getElementById('modal-mi-cuenta')) closeModal('modal-mi-cuenta');
 };
 
@@ -1504,38 +1510,155 @@ function actualizarBtnCuenta() {
   }
 }
 
-// Prellenar datos si hay sesión activa
-const _origIrAPagar = window.irAPagar;
-window.irAPagar = function() {
-  if(clienteActual) {
-    const elN = document.getElementById('pedido-nombre');
-    const elW = document.getElementById('pedido-tel');
-    if(elN && !elN.value) elN.value = clienteActual.nombre;
-    if(elW && !elW.value) elW.value = clienteActual.whatsapp;
+// ── ADMIN QUIOSCO — GESTIÓN DE DISEÑOS ───────────────────
+const CLOUD_KSK = 'dwabl0eti';
+const PRESET_KSK = 'seguro_ahorras';
+
+window.cambiarTabAdmin = function(tab) {
+  document.querySelectorAll('[data-atab]').forEach(b => b.classList.toggle('activo', b.dataset.atab===tab));
+  ['agregar','gestionar','etiquetas'].forEach(t => {
+    const el = document.getElementById('atab-'+t);
+    if(el) el.style.display = t===tab ? 'block' : 'none';
+  });
+  if(tab === 'gestionar') renderAdminDisenos();
+};
+
+window.previewAksk = function(input) {
+  const f = input.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    document.getElementById('aksk-preview-img').src = e.target.result;
+    document.getElementById('aksk-preview').style.display = 'block';
+  };
+  r.readAsDataURL(f);
+};
+
+window.guardarDisenoKiosco = async function() {
+  const nombre   = document.getElementById('aksk-nombre').value.trim();
+  const categoria= document.getElementById('aksk-categoria').value.trim();
+  const precio   = +document.getElementById('aksk-precio').value || 0;
+  const genero   = document.getElementById('aksk-genero').value;
+  const color    = document.getElementById('aksk-color').value.trim();
+  const file     = document.getElementById('aksk-imagen').files[0];
+
+  if(!nombre || !categoria || !precio) { toastKiosco('⚠️ Nombre, categoría y precio son obligatorios'); return; }
+  if(!file) { toastKiosco('⚠️ Selecciona una imagen'); return; }
+
+  const prog = document.getElementById('aksk-prog');
+  prog.style.display = 'block';
+  prog.textContent = '⏳ Subiendo imagen...';
+
+  try {
+    // Subir imagen a Cloudinary
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', PRESET_KSK);
+    fd.append('folder', 'kiosco-beloma');
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_KSK}/image/upload`, { method:'POST', body:fd });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error.message);
+
+    const id = 'ksk-' + Date.now();
+    await addDoc(collection(db, 'ksk_disenos'), {
+      id, nombre, categoria, precio, genero, color,
+      imagen: data.secure_url,
+      activo: true,
+      creado: new Date().toISOString()
+    });
+
+    // Limpiar form
+    ['aksk-nombre','aksk-categoria','aksk-precio','aksk-color'].forEach(i => {
+      const el = document.getElementById(i); if(el) el.value='';
+    });
+    document.getElementById('aksk-genero').value = '';
+    document.getElementById('aksk-imagen').value = '';
+    document.getElementById('aksk-preview').style.display = 'none';
+    prog.style.display = 'none';
+    toastKiosco('✅ Diseño agregado al quiosco');
+  } catch(e) {
+    prog.style.display = 'none';
+    toastKiosco('❌ Error: ' + e.message);
   }
-  _origIrAPagar();
+};
+
+window.renderAdminDisenos = function() {
+  const q = (document.getElementById('aksk-buscar')?.value || '').toLowerCase();
+  const lista = document.getElementById('aksk-lista');
+  if(!lista) return;
+  let filtrados = diseños.slice();
+  if(q) filtrados = filtrados.filter(d => d.nombre?.toLowerCase().includes(q) || d.categoria?.toLowerCase().includes(q));
+  if(!filtrados.length) { lista.innerHTML = '<div style="color:var(--ink-soft);font-size:13px;text-align:center;padding:20px;">Sin diseños.</div>'; return; }
+  lista.innerHTML = filtrados.map(d => `
+    <div style="display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);">
+      <img src="${d.imagen||''}" style="width:50px;height:50px;object-fit:cover;border-radius:8px;flex-shrink:0;background:#333;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.nombre}</div>
+        <div style="font-size:12px;color:var(--ink-soft);">${d.categoria} · $${(+d.precio||0).toLocaleString('es-MX')}</div>
+      </div>
+      <button onclick="eliminarDisenoKiosco('${d.id}')"
+        style="background:#C0392B;color:#fff;border:none;padding:8px 12px;border-radius:8px;
+               font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;">
+        🗑 Eliminar
+      </button>
+    </div>`).join('');
+};
+
+window.eliminarDisenoKiosco = async function(id) {
+  if(!confirm('¿Eliminar este diseño del quiosco?')) return;
+  try {
+    const snap = await getDocs(query(collection(db,'ksk_disenos'), where('id','==',id)));
+    if(!snap.empty) await deleteDoc(snap.docs[0].ref);
+    toastKiosco('🗑 Diseño eliminado');
+    renderAdminDisenos();
+  } catch(e) { toastKiosco('❌ Error al eliminar'); }
 };
 
 </script>
 
 <!-- MODAL ADMIN QUIOSCO -->
 <div class="modal-overlay" id="modal-admin-kiosco">
-  <div class="modal" style="max-width:480px;">
+  <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto;">
     <button onclick="closeModal('modal-admin-kiosco')" style="position:sticky;top:0;width:100%;
       background:rgba(30,30,30,0.95);border:none;color:#fff;font-size:16px;font-weight:700;
       padding:14px;cursor:pointer;display:flex;align-items:center;gap:8px;
-      font-family:'Inter',sans-serif;border-bottom:1px solid rgba(255,255,255,0.1);">
+      font-family:'Inter',sans-serif;border-bottom:1px solid rgba(255,255,255,0.1);z-index:2;">
       ← Cerrar
     </button>
     <div class="modal-body">
-      <h2 style="font-size:20px;font-weight:800;margin-bottom:6px;">⚙️ Admin Quiosco</h2>
-      <p style="font-size:13px;color:var(--ink-soft);margin-bottom:16px;">Busca un diseño y asígnale una sección.</p>
-      <input type="text" id="admin-buscar" placeholder="🔍 Buscar diseño..."
-        oninput="buscarParaAdmin(this.value)"
-        style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:12px;
-               padding:12px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;
-               outline:none;margin-bottom:14px;">
-      <div id="admin-resultados"></div>
+      <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid var(--border);">
+        <button class="reporte-tab activo" data-atab="agregar" onclick="cambiarTabAdmin('agregar')">➕ Agregar</button>
+        <button class="reporte-tab" data-atab="gestionar" onclick="cambiarTabAdmin('gestionar')">🗂 Gestionar</button>
+        <button class="reporte-tab" data-atab="etiquetas" onclick="cambiarTabAdmin('etiquetas')">🏷 Etiquetas</button>
+      </div>
+      <!-- Tab Agregar -->
+      <div id="atab-agregar">
+        <input type="text" id="aksk-nombre" placeholder="Nombre del diseño *" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;margin-bottom:10px;">
+        <input type="text" id="aksk-categoria" placeholder="Categoría *" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;margin-bottom:10px;">
+        <input type="number" id="aksk-precio" placeholder="Precio ($) *" step="0.01" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;margin-bottom:10px;">
+        <select id="aksk-genero" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;margin-bottom:10px;">
+          <option value="">— Género —</option>
+          <option value="Hombre">Hombre</option><option value="Mujer">Mujer</option>
+          <option value="Niño">Niño</option><option value="Juvenil">Juvenil</option>
+          <option value="Bebé">Bebé</option><option value="Bebé Pañalero">Bebé Pañalero</option>
+        </select>
+        <input type="text" id="aksk-color" placeholder="Color de playera (ej. Blanca)" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;margin-bottom:10px;">
+        <label style="font-size:13px;color:var(--ink-soft);display:block;margin-bottom:6px;">📷 Imagen</label>
+        <input type="file" id="aksk-imagen" accept="image/*" onchange="previewAksk(this)" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--ink);font-size:13px;outline:none;margin-bottom:10px;">
+        <div id="aksk-preview" style="display:none;margin-bottom:12px;"><img id="aksk-preview-img" style="width:100%;max-height:180px;object-fit:contain;border-radius:10px;background:#333;"></div>
+        <div id="aksk-prog" style="display:none;font-size:13px;color:var(--ink-soft);margin-bottom:10px;text-align:center;">⏳ Subiendo...</div>
+        <button onclick="guardarDisenoKiosco()" style="width:100%;background:var(--green);color:#fff;border:none;padding:14px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;">✅ Guardar diseño</button>
+      </div>
+      <!-- Tab Gestionar -->
+      <div id="atab-gestionar" style="display:none;">
+        <input type="text" id="aksk-buscar" placeholder="🔍 Buscar..." oninput="renderAdminDisenos()" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;margin-bottom:12px;">
+        <div id="aksk-lista" style="max-height:400px;overflow-y:auto;"></div>
+      </div>
+      <!-- Tab Etiquetas -->
+      <div id="atab-etiquetas" style="display:none;">
+        <p style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">Asigna secciones especiales a los diseños.</p>
+        <input type="text" id="admin-buscar" placeholder="🔍 Buscar diseño..." oninput="buscarParaAdmin(this.value)" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;margin-bottom:14px;">
+        <div id="admin-resultados" style="max-height:380px;overflow-y:auto;"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1606,9 +1729,9 @@ window.irAPagar = function() {
 </div>
 
 <!-- MODAL DISEÑO PERSONALIZADO -->
-<div class="modal-overlay" id="modal-personalizado" onclick="cerrarPersonalizadoOverlay(event)">
+<div class="modal-overlay" id="modal-personalizado">
   <div class="modal" style="max-width:500px;">
-    <button onclick="closeModal('modal-personalizado')" style="position:sticky;top:0;width:100%;
+    <button onclick="cerrarPersonalizadoConConfirm()" style="position:sticky;top:0;width:100%;
       background:rgba(30,30,30,0.95);border:none;color:#fff;font-size:16px;font-weight:700;
       padding:14px;cursor:pointer;display:flex;align-items:center;gap:8px;
       font-family:'Inter',sans-serif;border-bottom:1px solid rgba(255,255,255,0.1);">
@@ -1673,6 +1796,21 @@ window.irAPagar = function() {
                font-family:'Inter',sans-serif;">
         💬 Confirmar y abrir WhatsApp
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMAR CIERRE PERSONALIZADO -->
+<div class="modal-overlay" id="modal-confirm-personalizado" style="z-index:1400;">
+  <div class="modal" style="max-width:360px;text-align:center;">
+    <div class="modal-body" style="padding:32px 24px 20px;">
+      <div style="font-size:44px;margin-bottom:14px;">⚠️</div>
+      <div style="font-size:17px;font-weight:700;margin-bottom:10px;">¿Salir sin confirmar?</div>
+      <div style="font-size:14px;color:var(--ink-soft);line-height:1.5;">Tu selección de género, talla y color se perderá.</div>
+    </div>
+    <div class="modal-footer" style="justify-content:center;gap:12px;">
+      <button class="btn btn-ghost" onclick="closeModal('modal-confirm-personalizado')">✏️ Seguir</button>
+      <button class="btn btn-danger" onclick="confirmarCierrePersonalizado()">🚪 Salir</button>
     </div>
   </div>
 </div>
