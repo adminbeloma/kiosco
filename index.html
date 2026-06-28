@@ -447,9 +447,18 @@
       </div>
     </div>
 
-    <!-- Categorías -->
+    <!-- Diseño Personalizado -->
     <div style="font-size:13px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;
-                letter-spacing:0.08em;margin-bottom:12px;">🎨 Explorar por categoría</div>
+                letter-spacing:0.08em;margin-bottom:12px;margin-top:8px;">✏️ ¿Tienes tu propio diseño?</div>
+    <div class="tarjeta-inicio tarjeta-especial" onclick="abrirDisenoPersonalizado()"
+      style="background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);
+             border:2px solid var(--green);margin-bottom:24px;">
+      <div class="tarjeta-overlay" style="background:rgba(0,0,0,0.3);flex-direction:column;
+           align-items:flex-start;justify-content:flex-end;gap:4px;">
+        <div style="font-size:20px;font-weight:900;">✏️ Diseño Personalizado</div>
+        <div style="font-size:13px;font-weight:400;opacity:0.85;">Elige género, talla y color — manda tu diseño por WhatsApp</div>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
       <div class="tarjeta-inicio" onclick="verCategoria('Anime')"
         style="background-image:url('img/anime.jpg')">
@@ -566,13 +575,7 @@
       </div>
 
       <div class="opcion-label">Color de playera</div>
-      <div class="opciones-row">
-        <button class="opcion-btn sel" data-color="Blanca" onclick="selColor(this)">⚪ Blanca</button>
-        <button class="opcion-btn" data-color="Negra" onclick="selColor(this)">⚫ Negra</button>
-        <button class="opcion-btn" data-color="Gris" onclick="selColor(this)">🔘 Gris</button>
-        <button class="opcion-btn" data-color="Azul" onclick="selColor(this)">🔵 Azul</button>
-        <button class="opcion-btn" data-color="Rojo" onclick="selColor(this)">🔴 Rojo</button>
-      </div>
+      <div class="opciones-row" id="modal-colores"></div>
 
       <div class="opcion-label">Cantidad</div>
       <div class="cantidad-row">
@@ -778,9 +781,35 @@ window.abrirDetalle = function(id) {
   document.getElementById('modal-notas').value = '';
   document.getElementById('modal-cant-val').textContent = '1';
   actualizarSubtotal();
-  // Reset selecciones
-  document.querySelectorAll('[data-talla]').forEach((b,i) => b.classList.toggle('sel', i===0));
-  document.querySelectorAll('[data-color]').forEach((b,i) => b.classList.toggle('sel', i===0));
+
+  // Tallas según género
+  const genero = diseñoActual.genero || '';
+  let tallas;
+  if(genero === 'Mujer') {
+    tallas = ['S','M','L','XL'];
+  } else if(genero === 'Niño') {
+    tallas = ['CH (4 años)','MED (6 años)','GDE (8 años)','XL (10 años)'];
+  } else if(genero === 'Juvenil') {
+    tallas = ['CH (12 años)','MED (14 años)','GDE (16 años)','XL (18 años)'];
+  } else if(genero === 'Bebé') {
+    tallas = ['Talla 1','Talla 2','Talla 3'];
+  } else if(genero === 'Bebé Pañalero') {
+    tallas = ['3 meses','6 meses','9 meses','12 meses','18 meses','24 meses'];
+  } else {
+    tallas = ['S','M','L','XL','XXL','3XL']; // Hombre y sin género
+  }
+  const tallasWrap = document.getElementById('modal-tallas');
+  tallasWrap.innerHTML = tallas.map((t,i) =>
+    `<button class="opcion-btn ${i===0?'sel':''}" data-talla="${t}" onclick="selTalla(this)">${t}</button>`
+  ).join('');
+
+  // Color del diseño — mostrar solo el color que tiene la playera
+  const colorDiseno = diseñoActual.color || 'Blanca';
+  const coloresWrap = document.getElementById('modal-colores');
+  if(coloresWrap) {
+    coloresWrap.innerHTML = `<button class="opcion-btn sel" data-color="${colorDiseno}" onclick="selColor(this)">${colorDiseno}</button>`;
+  }
+
   document.getElementById('modal-detalle').classList.add('open');
 };
 
@@ -1148,11 +1177,11 @@ function tarjetaDiseno(d, pequeña=false) {
   const etiquetas = JSON.parse(localStorage.getItem('ksk_etiquetas')||'{}');
   const tag = etiquetas[d.id];
   const badges = { destacado:'⭐', nuevo:'🆕', mas_vendido:'🔥', descuento:'💥' };
-  return `<div class="diseno-card" onclick="abrirDetalle('${d.id}')">
+  return `<div class="diseno-card" onclick="abrirDetalle('${d.id}')" style="position:relative;">
     ${tag ? `<div style="position:absolute;top:8px;left:8px;font-size:16px;z-index:1;">${badges[tag]||''}</div>` : ''}
     <img src="${d.imagen||''}" alt="${d.nombre}"
       onerror="this.style.background='#333';this.removeAttribute('src')" loading="lazy"
-      style="width:100%;${pequeña?'aspect-ratio:1':'max-height:55vh'};object-fit:cover;">
+      style="width:100%;aspect-ratio:1;object-fit:cover;display:block;">
     <div class="info">
       <div class="nombre">${d.nombre}</div>
       <div class="categoria">${d.categoria||''}</div>
@@ -1235,7 +1264,157 @@ function toastKiosco(msg) {
   setTimeout(() => t.style.display = 'none', 1800);
 }
 
-// ── SISTEMA DE CUENTAS ─────────────────────────────────────
+// ── DISEÑO PERSONALIZADO ──────────────────────────────────
+const COLORES_POR_GENERO = {
+  'Hombre':        ['Blanco','Plata','Gris Jaspe','Carbón','Negro','Beige','Arena','Chocolate','Marrón','Ladrillo','Ocre','Rojo','Naranja','Mango','Canario','Lima','Jade','Olivo','Vde Bosque','Marino','Delfín','Royal','Turquesa','Celeste','Azul Claro','Aqua','Coral','Rosa Claro','Fucsia','Morado'],
+  'Mujer':         ['Blanco','Gris Jaspe','Negro','Morado','Fucsia','Coral','Rosa Claro','Aqua','Azul Claro','Turquesa','Royal','Marino','Jade','Lima','Canario','Mango','Naranja','Rojo'],
+  'Niño':          ['Blanco','Gris Jaspe','Carbón','Negro','Morado','Fucsia','Rosa Claro','Celeste','Turquesa','Royal','Marino','Lima','Canario','Mango','Naranja','Rojo'],
+  'Juvenil':       ['Blanco','Gris Jaspe','Carbón','Negro','Morado','Fucsia','Rosa Pastel','Celeste','Mango','Turquesa','Royal','Jade','Lima','Canario','Naranja','Rojo'],
+  'Bebé':          ['Blanco','Negro','Rojo','Naranja','Canario','Lima','Marino','Royal','Turquesa','Celeste','Rosa Pastel','Fucsia'],
+  'Bebé Pañalero': ['Blanco']
+};
+
+const TALLAS_POR_GENERO = {
+  'Hombre':        ['S','M','L','XL','XXL','3XL'],
+  'Mujer':         ['S','M','L','XL'],
+  'Niño':          ['CH (4 años)','MED (6 años)','GDE (8 años)','XL (10 años)'],
+  'Juvenil':       ['CH (12 años)','MED (14 años)','GDE (16 años)','XL (18 años)'],
+  'Bebé':          ['Talla 1 (1 año)','Talla 2 (2 años)','Talla 3 (3 años)'],
+  'Bebé Pañalero': ['Talla única']
+};
+
+const GUIA_TALLAS_IMG = {
+  'Hombre':  'img/tallas-hombre.jpg',
+  'Mujer':   'img/tallas-mujer.jpg',
+  'Niño':    'img/tallas-nino.jpg',
+  'Juvenil': 'img/tallas-juvenil.jpg',
+  'Bebé':    'img/tallas-bebe.jpg',
+  'Bebé Pañalero': null
+};
+
+const COLORES_HEX = {
+  'Blanco':'#FFFFFF','Plata':'#C0C0C0','Gris Jaspe':'#A8A9AD','Carbón':'#4A4A4A','Negro':'#111111',
+  'Beige':'#D4B896','Arena':'#C2A882','Chocolate':'#5C3317','Marrón':'#7B3F00','Ladrillo':'#8B2500',
+  'Ocre':'#CC7722','Rojo':'#CC0000','Naranja':'#FF6600','Mango':'#FF8C00','Canario':'#FFD700',
+  'Lima':'#A8C744','Jade':'#00A878','Olivo':'#6B6B2A','Vde Bosque':'#1A4A2A','Marino':'#1B2A6B',
+  'Delfín':'#1B3A7A','Royal':'#2240C4','Turquesa':'#00A8CC','Celeste':'#87CEEB','Azul Claro':'#ADD8E6',
+  'Aqua':'#00CED1','Coral':'#FF6B6B','Rosa Claro':'#FFB6C1','Rosa Pastel':'#FFD1DC','Fucsia':'#FF1493','Morado':'#6B2FA0'
+};
+
+let pGenero = 'Hombre'; let pTalla = ''; let pColor = '';
+
+window.abrirDisenoPersonalizado = function() {
+  pGenero = 'Hombre'; pTalla = ''; pColor = '';
+  // Prellenar datos si hay sesión
+  if(clienteActual) {
+    document.getElementById('p-nombre').value = clienteActual.nombre || '';
+    document.getElementById('p-tel').value    = clienteActual.whatsapp || '';
+  } else {
+    document.getElementById('p-nombre').value = '';
+    document.getElementById('p-tel').value    = '';
+  }
+  document.querySelectorAll('[data-gen-p]').forEach((b,i) => b.classList.toggle('sel', i===0));
+  actualizarTallasYColoresP('Hombre');
+  document.getElementById('modal-personalizado').classList.add('open');
+};
+
+window.cerrarPersonalizadoOverlay = function(e) {
+  if(e.target === document.getElementById('modal-personalizado')) closeModal('modal-personalizado');
+};
+
+window.selGeneroP = function(btn) {
+  pGenero = btn.dataset.genP;
+  document.querySelectorAll('[data-gen-p]').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  pTalla = ''; pColor = '';
+  actualizarTallasYColoresP(pGenero);
+};
+
+function actualizarTallasYColoresP(genero) {
+  const tallas = TALLAS_POR_GENERO[genero] || [];
+  const tallasWrap = document.getElementById('p-tallas');
+  const tallasSection = document.getElementById('p-tallas-section');
+  const guiaBtn = document.getElementById('p-guia-tallas-btn');
+
+  // Bebé Pañalero: ocultar tallas y guía
+  if(genero === 'Bebé Pañalero') {
+    tallasSection.style.display = 'none';
+    if(guiaBtn) guiaBtn.style.display = 'none';
+    pTalla = 'Talla única';
+  } else {
+    tallasSection.style.display = 'block';
+    tallasWrap.innerHTML = tallas.map((t,i) =>
+      `<button class="opcion-btn ${i===0?'sel':''}" onclick="selTallaP(this,'${t}')">${t}</button>`
+    ).join('');
+    pTalla = tallas[0] || '';
+    // Mostrar botón guía solo si hay imagen
+    if(guiaBtn) {
+      guiaBtn.style.display = GUIA_TALLAS_IMG[genero] ? 'inline-flex' : 'none';
+    }
+  }
+
+  // Colores
+  const colores = COLORES_POR_GENERO[genero] || [];
+  document.getElementById('p-colores').innerHTML = colores.map((c,i) => {
+    const hex = COLORES_HEX[c] || '#888';
+    const borde = c === 'Blanco' ? 'border:2px solid #ccc;' : 'border:2px solid transparent;';
+    return `<div onclick="selColorP(this,'${c}')" title="${c}"
+      style="${borde}${i===0?'box-shadow:0 0 0 3px var(--green);':''}
+             width:36px;height:36px;border-radius:50%;background:${hex};cursor:pointer;
+             transition:box-shadow 0.15s;flex-shrink:0;position:relative;" data-color-p="${c}">
+      ${c==='Blanco'?'':''}
+    </div>`;
+  }).join('');
+  pColor = colores[0] || '';
+}
+
+window.selTallaP = function(btn, talla) {
+  pTalla = talla;
+  document.querySelectorAll('#p-tallas .opcion-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+};
+
+window.selColorP = function(el, color) {
+  pColor = color;
+  document.querySelectorAll('[data-color-p]').forEach(b => {
+    b.style.boxShadow = b.dataset.colorP === color ? '0 0 0 3px var(--green)' : '';
+  });
+};
+
+window.confirmarDisenoPersonalizado = function() {
+  const nombre = document.getElementById('p-nombre').value.trim();
+  const tel    = document.getElementById('p-tel').value.trim().replace(/\D/g,'');
+  if(!nombre) { toastKiosco('⚠️ Ingresa tu nombre'); return; }
+  if(tel.length < 10) { toastKiosco('⚠️ Ingresa tu WhatsApp de 10 dígitos'); return; }
+  if(!pTalla) { toastKiosco('⚠️ Selecciona una talla'); return; }
+  if(!pColor) { toastKiosco('⚠️ Selecciona un color'); return; }
+
+  const folio = 'KSK-P-' + Date.now().toString(36).toUpperCase().slice(-6);
+  const msg = `🎨 *DISEÑO PERSONALIZADO — PLAYERAS BELOMA*\n\n` +
+    `📋 Folio: *${folio}*\n` +
+    `👤 Cliente: ${nombre}\n` +
+    `📱 WhatsApp: ${tel}\n\n` +
+    `👕 Género: ${pGenero}\n` +
+    `📐 Talla: ${pTalla}\n` +
+    `🎨 Color: ${pColor}\n\n` +
+    `📎 *Por favor manda tu diseño/imagen a este WhatsApp.*\n` +
+    `Incluye tu folio *${folio}* para identificar tu pedido.\n\n` +
+    `📍 Plaza Nájera Local 7, Av. Gutiérrez Nájera #511\n` +
+    `🕐 Lun–Vie 9–17 · Sáb 11–15`;
+
+  const telWs = '52' + tel;
+  const url = `https://wa.me/${telWs}?text=${encodeURIComponent(msg)}`;
+  closeModal('modal-personalizado');
+  window.open(url, '_blank');
+  toastKiosco('💬 Abriendo WhatsApp...');
+};
+window.verGuiaTallas = function() {
+  const imgUrl = GUIA_TALLAS_IMG[pGenero];
+  if(!imgUrl) return;
+  document.getElementById('guia-tallas-img').src = imgUrl;
+  document.getElementById('modal-guia-tallas').classList.add('open');
+};
+
 let clienteActual = null;
 
 (function restaurarSesion() {
@@ -1421,6 +1600,94 @@ window.irAPagar = function() {
         </button>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DISEÑO PERSONALIZADO -->
+<div class="modal-overlay" id="modal-personalizado" onclick="cerrarPersonalizadoOverlay(event)">
+  <div class="modal" style="max-width:500px;">
+    <button onclick="closeModal('modal-personalizado')" style="position:sticky;top:0;width:100%;
+      background:rgba(30,30,30,0.95);border:none;color:#fff;font-size:16px;font-weight:700;
+      padding:14px;cursor:pointer;display:flex;align-items:center;gap:8px;
+      font-family:'Inter',sans-serif;border-bottom:1px solid rgba(255,255,255,0.1);">
+      ← Volver
+    </button>
+    <div class="modal-body">
+      <h2 style="font-size:20px;font-weight:800;margin-bottom:6px;">✏️ Diseño Personalizado</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-bottom:20px;">
+        Elige las características de tu playera y mándanos tu diseño por WhatsApp.
+      </p>
+
+      <!-- Género -->
+      <div class="opcion-label">Género</div>
+      <div class="opciones-row" style="flex-wrap:wrap;margin-bottom:16px;">
+        <button class="opcion-btn sel" data-gen-p="Hombre" onclick="selGeneroP(this)">👨 Hombre</button>
+        <button class="opcion-btn" data-gen-p="Mujer" onclick="selGeneroP(this)">👩 Mujer</button>
+        <button class="opcion-btn" data-gen-p="Niño" onclick="selGeneroP(this)">👦 Niño</button>
+        <button class="opcion-btn" data-gen-p="Juvenil" onclick="selGeneroP(this)">🧒 Juvenil</button>
+        <button class="opcion-btn" data-gen-p="Bebé" onclick="selGeneroP(this)">👶 Bebé</button>
+        <button class="opcion-btn" data-gen-p="Bebé Pañalero" onclick="selGeneroP(this)">🍼 Bebé Pañalero</button>
+      </div>
+
+      <!-- Talla -->
+      <div id="p-tallas-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div class="opcion-label" style="margin-bottom:0;">Talla</div>
+          <button id="p-guia-tallas-btn" onclick="verGuiaTallas()"
+            style="font-size:12px;color:var(--green);background:none;border:1px solid var(--green);
+                   border-radius:20px;padding:4px 12px;cursor:pointer;font-family:'Inter',sans-serif;
+                   font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+            📏 Guía de tallas
+          </button>
+        </div>
+        <div class="opciones-row" id="p-tallas" style="flex-wrap:wrap;margin-bottom:16px;"></div>
+      </div>
+
+      <!-- Color -->
+      <div class="opcion-label">Color de playera</div>
+      <div id="p-colores" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;"></div>
+
+      <!-- Nombre y teléfono -->
+      <input type="text" id="p-nombre" placeholder="👤 Tu nombre"
+        style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:12px;
+               padding:12px 14px;color:var(--ink);font-size:15px;font-family:'Inter',sans-serif;
+               outline:none;margin-bottom:10px;">
+      <input type="tel" id="p-tel" placeholder="📱 Tu WhatsApp (10 dígitos)"
+        style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:12px;
+               padding:12px 14px;color:var(--ink);font-size:15px;font-family:'Inter',sans-serif;
+               outline:none;margin-bottom:16px;">
+
+      <!-- Nota WhatsApp -->
+      <div style="background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.3);
+                  border-radius:12px;padding:14px;margin-bottom:16px;font-size:13px;line-height:1.6;">
+        💬 <strong>¿Cómo mando mi diseño?</strong><br>
+        Después de confirmar, manda tu imagen o arte por WhatsApp al <strong>669 154 9680</strong>.
+        Incluye tu folio para que podamos identificar tu pedido.
+      </div>
+
+      <button onclick="confirmarDisenoPersonalizado()"
+        style="width:100%;background:#25D366;color:#fff;border:none;padding:16px;
+               border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;
+               font-family:'Inter',sans-serif;">
+        💬 Confirmar y abrir WhatsApp
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL GUÍA DE TALLAS -->
+<div class="modal-overlay" id="modal-guia-tallas" onclick="closeModal('modal-guia-tallas')" style="z-index:1300;">
+  <div class="modal" style="max-width:600px;">
+    <button onclick="closeModal('modal-guia-tallas')" style="position:sticky;top:0;width:100%;
+      background:rgba(30,30,30,0.95);border:none;color:#fff;font-size:16px;font-weight:700;
+      padding:14px;cursor:pointer;display:flex;align-items:center;gap:8px;
+      font-family:'Inter',sans-serif;border-bottom:1px solid rgba(255,255,255,0.1);">
+      ← Volver
+    </button>
+    <div class="modal-body" style="padding:16px;">
+      <img id="guia-tallas-img" src="" alt="Guía de tallas"
+        style="width:100%;border-radius:12px;">
     </div>
   </div>
 </div>
