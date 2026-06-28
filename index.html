@@ -1277,7 +1277,7 @@ const TALLAS_POR_GENERO = {
   'Niño':          ['CH (4 años)','MED (6 años)','GDE (8 años)','XL (10 años)'],
   'Juvenil':       ['CH (12 años)','MED (14 años)','GDE (16 años)','XL (18 años)'],
   'Bebé':          ['Talla 1 (1 año)','Talla 2 (2 años)','Talla 3 (3 años)'],
-  'Bebé Pañalero': ['Talla única']
+  'Bebé Pañalero': ['3 meses','6 meses','9 meses','12 meses','18 meses','24 meses']
 };
 
 const GUIA_TALLAS_IMG = {
@@ -1320,7 +1320,8 @@ window.cerrarPersonalizadoOverlay = function(e) {
 };
 
 window.selGeneroP = function(btn) {
-  pGenero = btn.dataset.genP;
+  const mapa = { 'Hombre':'Hombre', 'Mujer':'Mujer', 'Nino':'Niño', 'Juvenil':'Juvenil', 'Bebe':'Bebé', 'PanaleroB':'Bebé Pañalero' };
+  pGenero = mapa[btn.dataset.genP] || btn.dataset.genP;
   document.querySelectorAll('[data-gen-p]').forEach(b => b.classList.remove('sel'));
   btn.classList.add('sel');
   pTalla = ''; pColor = '';
@@ -1333,11 +1334,14 @@ function actualizarTallasYColoresP(genero) {
   const tallasSection = document.getElementById('p-tallas-section');
   const guiaBtn = document.getElementById('p-guia-tallas-btn');
 
-  // Bebé Pañalero: ocultar tallas y guía
+  // Bebé Pañalero: mostrar tallas de meses, solo color blanco
   if(genero === 'Bebé Pañalero') {
-    tallasSection.style.display = 'none';
+    tallasSection.style.display = 'block';
+    tallasWrap.innerHTML = tallas.map((t,i) =>
+      `<button class="opcion-btn ${i===0?'sel':''}" onclick="selTallaP(this,'${t}')">${t}</button>`
+    ).join('');
+    pTalla = tallas[0] || '';
     if(guiaBtn) guiaBtn.style.display = 'none';
-    pTalla = 'Talla única';
   } else {
     tallasSection.style.display = 'block';
     tallasWrap.innerHTML = tallas.map((t,i) =>
@@ -1621,10 +1625,10 @@ window.irAPagar = function() {
       <div class="opciones-row" style="flex-wrap:wrap;margin-bottom:16px;">
         <button class="opcion-btn sel" data-gen-p="Hombre" onclick="selGeneroP(this)">👨 Hombre</button>
         <button class="opcion-btn" data-gen-p="Mujer" onclick="selGeneroP(this)">👩 Mujer</button>
-        <button class="opcion-btn" data-gen-p="Niño" onclick="selGeneroP(this)">👦 Niño</button>
+        <button class="opcion-btn" data-gen-p="Nino" onclick="selGeneroP(this)">👦 Niño</button>
         <button class="opcion-btn" data-gen-p="Juvenil" onclick="selGeneroP(this)">🧒 Juvenil</button>
-        <button class="opcion-btn" data-gen-p="Bebé" onclick="selGeneroP(this)">👶 Bebé</button>
-        <button class="opcion-btn" data-gen-p="Bebé Pañalero" onclick="selGeneroP(this)">🍼 Bebé Pañalero</button>
+        <button class="opcion-btn" data-gen-p="Bebe" onclick="selGeneroP(this)">👶 Bebé</button>
+        <button class="opcion-btn" data-gen-p="PanaleroB" onclick="selGeneroP(this)">🍼 Bebé Pañalero</button>
       </div>
 
       <!-- Talla -->
