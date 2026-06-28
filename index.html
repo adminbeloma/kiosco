@@ -825,6 +825,7 @@ window.cerrarDetalleOverlay = function(e) {
 window.selTalla = function(btn) {
   document.querySelectorAll('[data-talla]').forEach(b => b.classList.remove('sel'));
   btn.classList.add('sel');
+  actualizarSubtotal();
 };
 window.selColor = function(btn) {
   document.querySelectorAll('[data-color]').forEach(b => b.classList.remove('sel'));
@@ -838,8 +839,12 @@ window.cambiarCant = function(delta) {
 };
 
 function actualizarSubtotal() {
-  const precio = +diseñoActual?.precio || 0;
+  const talla = document.querySelector('[data-talla].sel')?.dataset.talla || '';
+  let precio = +diseñoActual?.precio || 0;
+  if(talla === '2XL' && diseñoActual?.precio2xl) precio = +diseñoActual.precio2xl;
+  if(talla === '3XL' && diseñoActual?.precio3xl) precio = +diseñoActual.precio3xl;
   const sub = precio * cantActual;
+  document.getElementById('modal-precio').textContent = precio > 0 ? '$'+Number(precio).toLocaleString('es-MX') : 'Consultar precio';
   document.getElementById('modal-subtotal').textContent = sub > 0 ? '$'+sub.toLocaleString('es-MX') : '';
 }
 
@@ -847,17 +852,18 @@ window.agregarAlCarrito = function() {
   const talla = document.querySelector('[data-talla].sel')?.dataset.talla || 'M';
   const color = document.querySelector('[data-color].sel')?.dataset.color || 'Blanca';
   const notas = document.getElementById('modal-notas').value;
+  let precio = +diseñoActual?.precio || 0;
+  if(talla === '2XL' && diseñoActual?.precio2xl) precio = +diseñoActual.precio2xl;
+  if(talla === '3XL' && diseñoActual?.precio3xl) precio = +diseñoActual.precio3xl;
   carrito.push({
     id: Date.now(),
     diseñoId: diseñoActual.id,
     nombre:   diseñoActual.nombre,
     imagen:   diseñoActual.imagen,
-    precio:   +diseñoActual.precio || 0,
-    talla, color, cantidad: cantActual, notas
+    precio, talla, color, cantidad: cantActual, notas
   });
   cerrarDetalle();
   actualizarBadge();
-  // Flash del botón carrito
   const btn = document.querySelector('.header-carrito');
   btn.style.background = '#3A8A0F';
   setTimeout(() => btn.style.background = '', 400);
@@ -1549,6 +1555,8 @@ window.kskArchivosSeleccionados = function(files) {
         nombre: file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '),
         categoria: document.getElementById('ksk-g-categoria').value || '',
         precio: document.getElementById('ksk-g-precio').value || '',
+        precio2xl: document.getElementById('ksk-g-precio2xl').value || '',
+        precio3xl: document.getElementById('ksk-g-precio3xl').value || '',
         genero: document.getElementById('ksk-g-genero').value || '',
         color: document.getElementById('ksk-g-color').value || ''
       });
@@ -1578,12 +1586,20 @@ function kskRenderGrid() {
           style="width:100%;background:var(--dark);border:1px solid var(--border);border-radius:6px;
                  padding:5px 8px;font-size:11px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;margin-bottom:4px;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-          <input type="number" value="${item.precio}" placeholder="Precio"
+          <input type="number" value="${item.precio}" placeholder="Precio base"
             oninput="kskUpdateItem('${item.id}','precio',this.value)"
             style="background:var(--dark);border:1px solid var(--border);border-radius:6px;
                    padding:5px 8px;font-size:11px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
           <input type="text" value="${item.color}" placeholder="Color"
             oninput="kskUpdateItem('${item.id}','color',this.value)"
+            style="background:var(--dark);border:1px solid var(--border);border-radius:6px;
+                   padding:5px 8px;font-size:11px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
+          <input type="number" value="${item.precio2xl||''}" placeholder="Precio 2XL"
+            oninput="kskUpdateItem('${item.id}','precio2xl',this.value)"
+            style="background:var(--dark);border:1px solid var(--border);border-radius:6px;
+                   padding:5px 8px;font-size:11px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
+          <input type="number" value="${item.precio3xl||''}" placeholder="Precio 3XL"
+            oninput="kskUpdateItem('${item.id}','precio3xl',this.value)"
             style="background:var(--dark);border:1px solid var(--border);border-radius:6px;
                    padding:5px 8px;font-size:11px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
         </div>
@@ -1639,6 +1655,8 @@ window.kskGuardarTodo = async function() {
         nombre: item.nombre.trim(),
         categoria: item.categoria || '',
         precio: +item.precio || 0,
+        precio2xl: +item.precio2xl || 0,
+        precio3xl: +item.precio3xl || 0,
         genero: item.genero || '',
         color: item.color || '',
         imagen: data.secure_url,
@@ -1806,7 +1824,11 @@ window.eliminarDisenoKiosco = async function(id) {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
             <input type="text" id="ksk-g-categoria" placeholder="Categoría" oninput="kskAplicarGlobal('categoria',this.value)"
               style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
-            <input type="number" id="ksk-g-precio" placeholder="Precio $" oninput="kskAplicarGlobal('precio',this.value)"
+            <input type="number" id="ksk-g-precio" placeholder="Precio base $" oninput="kskAplicarGlobal('precio',this.value)"
+              style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
+            <input type="number" id="ksk-g-precio2xl" placeholder="Precio 2XL $" oninput="kskAplicarGlobal('precio2xl',this.value)"
+              style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
+            <input type="number" id="ksk-g-precio3xl" placeholder="Precio 3XL $" oninput="kskAplicarGlobal('precio3xl',this.value)"
               style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
             <select id="ksk-g-genero" onchange="kskAplicarGlobal('genero',this.value)"
               style="background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:'Inter',sans-serif;outline:none;">
