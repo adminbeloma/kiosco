@@ -688,11 +688,11 @@
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, addDoc, getDocs, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // URL del Worker de Cloudflare que crea el link de pago y recibe el webhook de Mercado Pago.
 // El token de Mercado Pago vive SOLO ahí (como secreto), nunca en este HTML.
-const PAGOS_WORKER_URL = 'https://kiosco-beloma-pagos.TU-SUBDOMINIO.workers.dev'; // ← reemplaza con tu URL real al desplegar
+const PAGOS_WORKER_URL = 'https://kiosco-beloma-pagos.felipe-cristerna.workers.dev';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAvhG8RuytIv9rjsILWF8twyZeqTwfJ10I",
@@ -1800,18 +1800,53 @@ window.renderAdminDisenos = function() {
   if(q) filtrados = filtrados.filter(d => d.nombre?.toLowerCase().includes(q) || d.categoria?.toLowerCase().includes(q));
   if(!filtrados.length) { lista.innerHTML = '<div style="color:var(--ink-soft);font-size:13px;text-align:center;padding:20px;">Sin diseños.</div>'; return; }
   lista.innerHTML = filtrados.map(d => `
-    <div style="display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);">
+    <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);">
       <img src="${d.imagen||''}" style="width:50px;height:50px;object-fit:cover;border-radius:8px;flex-shrink:0;background:#333;">
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.nombre}</div>
-        <div style="font-size:12px;color:var(--ink-soft);">${d.categoria} · $${(+d.precio||0).toLocaleString('es-MX')}</div>
+        <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px;">${d.categoria}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <label style="font-size:11px;color:var(--ink-soft);">$
+            <input type="number" value="${(+d.precio||0)}" step="1" style="width:70px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);font-family:'Inter',sans-serif;font-size:12px;"
+              onchange="actualizarCampoDiseno('${d.id}','precio', this.value, this)">
+          </label>
+          <label style="font-size:11px;color:var(--ink-soft);">2XL $
+            <input type="number" value="${(+d.precio2xl||0)}" step="1" style="width:70px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);font-family:'Inter',sans-serif;font-size:12px;"
+              onchange="actualizarCampoDiseno('${d.id}','precio2xl', this.value, this)">
+          </label>
+          <label style="font-size:11px;color:var(--ink-soft);">3XL $
+            <input type="number" value="${(+d.precio3xl||0)}" step="1" style="width:70px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);font-family:'Inter',sans-serif;font-size:12px;"
+              onchange="actualizarCampoDiseno('${d.id}','precio3xl', this.value, this)">
+          </label>
+        </div>
       </div>
       <button onclick="eliminarDisenoKiosco('${d.id}')"
         style="background:#C0392B;color:#fff;border:none;padding:8px 12px;border-radius:8px;
-               font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;">
+               font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;flex-shrink:0;">
         🗑 Eliminar
       </button>
     </div>`).join('');
+};
+
+window.actualizarCampoDiseno = async function(id, campo, valor, inputEl) {
+  const num = Number(valor);
+  if(Number.isNaN(num) || num < 0) { toastKiosco('❌ Valor inválido'); return; }
+  try {
+    const snap = await getDocs(query(collection(db,'ksk_disenos'), where('id','==',id)));
+    if(snap.empty) { toastKiosco('❌ No se encontró el diseño'); return; }
+    await updateDoc(snap.docs[0].ref, { [campo]: num });
+    // Reflejar el cambio en el arreglo local para que la lista y el catálogo queden al día sin esperar el listener.
+    const local = diseños.find(d => d.id === id);
+    if(local) local[campo] = num;
+    if(inputEl) {
+      inputEl.style.borderColor = 'var(--green)';
+      setTimeout(() => { inputEl.style.borderColor = 'var(--border)'; }, 800);
+    }
+    toastKiosco('✅ Precio actualizado');
+  } catch(e) {
+    console.error('Error al actualizar diseño:', e);
+    toastKiosco('❌ Error al guardar');
+  }
 };
 
 window.eliminarDisenoKiosco = async function(id) {
