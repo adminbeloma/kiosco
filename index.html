@@ -690,6 +690,10 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, addDoc, getDocs, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+// URL del Worker de Cloudflare que crea el link de pago y recibe el webhook de Mercado Pago.
+// El token de Mercado Pago vive SOLO ahí (como secreto), nunca en este HTML.
+const PAGOS_WORKER_URL = 'https://kiosco-beloma-pagos.TU-SUBDOMINIO.workers.dev'; // ← reemplaza con tu URL real al desplegar
+
 const firebaseConfig = {
   apiKey: "AIzaSyAvhG8RuytIv9rjsILWF8twyZeqTwfJ10I",
   authDomain: "adminbeloma.firebaseapp.com",
@@ -940,43 +944,17 @@ window.selMetodo = function(btn) {
   document.getElementById('mp-panel').style.display = metodoPago === 'mercadopago' ? 'block' : 'none';
 };
 
-// ── MERCADO PAGO CHECKOUT PRO ────────────────────────────
-const MP_ACCESS_TOKEN = 'APP_USR-891421796666480-062712-bf4cfcaabeac13eeaa7d23903d2cbb15-27029173';
-const MP_PUBLIC_KEY   = 'APP_USR-506bdf18-23bb-4980-bd83-1225fdaa065f';
-
+// ── MERCADO PAGO CHECKOUT PRO (vía Worker — el token nunca viaja al navegador) ──
 async function crearPreferenciaMercadoPago(folio, nombre, email, total, items) {
   try {
-    const preference = {
-      items: items.map(i => ({
-        title: `${i.nombre} (Talla ${i.talla}, ${i.color})`,
-        quantity: i.cantidad,
-        unit_price: +i.precio || 1,
-        currency_id: 'MXN'
-      })),
-      payer: { name: nombre, email: email || 'cliente@beloma.mx' },
-      external_reference: folio,
-      back_urls: {
-        success: `https://adminbeloma.github.io/kiosco/?pago=exitoso&folio=${folio}`,
-        failure: `https://adminbeloma.github.io/kiosco/?pago=fallido&folio=${folio}`,
-        pending: `https://adminbeloma.github.io/kiosco/?pago=pendiente&folio=${folio}`
-      },
-      auto_return: 'approved',
-      statement_descriptor: 'Playeras Beloma',
-      notification_url: 'https://adminbeloma.github.io/kiosco/'
-    };
-
-    const resp = await fetch('https://api.mercadopago.com/checkout/preferences', {
+    const resp = await fetch(`${PAGOS_WORKER_URL}/api/crear-preferencia`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MP_ACCESS_TOKEN}`
-      },
-      body: JSON.stringify(preference)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folio, nombre, email, items })
     });
-
-    if(!resp.ok) throw new Error('Error MP: ' + resp.status);
+    if(!resp.ok) throw new Error('Error del Worker de pagos: ' + resp.status);
     const data = await resp.json();
-    return data.init_point; // URL de pago real
+    return data.init_point || null;
   } catch(e) {
     console.error('Error Mercado Pago:', e);
     return null;
@@ -1021,8 +999,8 @@ window.confirmarPedido = async function() {
 
       if(mpUrl) {
         document.getElementById('modal-pedido').classList.remove('open');
-        // Mostrar pantalla de redireccion a MP
-        mostrarRedirectMP(folio, nombre, tel, total, mpUrl);
+        // Mostrar pantalla de redireccion a MP y empezar a escuchar la confirmación automática
+        mostrarRedirectMP(folio, nombre, tel, total, mpUrl, pedidoData.items);
         return;
       } else {
         alert('No se pudo generar el link de pago. Por favor selecciona otro método.');
@@ -1053,14 +1031,17 @@ window.confirmarPedido = async function() {
   }
 };
 
-function mostrarRedirectMP(folio, nombre, tel, total, mpUrl) {
-  // Mostrar pantalla de redirección a Mercado Pago
+let unsubscribePago = null; // cancela el listener de confirmación si ya no aplica
+let resetPagoTimer   = null;
+
+function mostrarRedirectMP(folio, nombre, tel, total, mpUrl, items) {
+  // Mostrar pantalla de redirección a Mercado Pago, esperando confirmación automática
   const exito = document.getElementById('pantalla-exito');
   document.getElementById('exito-folio').textContent = '# ' + folio;
   document.getElementById('exito-msg').innerHTML =
     `Serás redirigido a Mercado Pago para completar tu pago.<br>` +
     `<strong style="color:var(--green);">Total: $${total.toLocaleString('es-MX')}</strong><br><br>` +
-    `📱 Guarda tu folio para cualquier aclaración`;
+    `<span id="estado-pago-txt">⏳ En cuanto pagues, esta pantalla se actualiza sola — no cierres.</span>`;
   document.getElementById('ws-btn-wrap').innerHTML = `
     <a href="${mpUrl}" target="_blank"
       style="display:inline-flex;align-items:center;gap:10px;background:#009EE3;color:#fff;
@@ -1069,7 +1050,61 @@ function mostrarRedirectMP(folio, nombre, tel, total, mpUrl) {
       💳 Pagar con Mercado Pago
     </a>`;
   exito.style.display = 'flex';
-  setTimeout(() => nuevoCliente(), 120000); // Reset en 2 minutos
+
+  // Si después de 5 minutos no hay confirmación, se resetea (el pedido se queda
+  // guardado como "Pago pendiente" en Firestore, no se pierde).
+  clearTimeout(resetPagoTimer);
+  resetPagoTimer = setTimeout(() => nuevoCliente(), 300000);
+
+  escucharConfirmacionPago(folio, nombre, tel, total, items);
+}
+
+// Escucha en tiempo real el pedido en Firestore. En cuanto el Worker de pagos
+// marca estado:'Pagado' (webhook de Mercado Pago), actualiza la pantalla solo,
+// sin que nadie tenga que revisar nada a mano.
+function escucharConfirmacionPago(folio, nombre, tel, total, items) {
+  if(unsubscribePago) { unsubscribePago(); unsubscribePago = null; }
+
+  const q = query(collection(db, 'pl_pedidos_kiosco'), where('folio', '==', folio));
+  unsubscribePago = onSnapshot(q, snap => {
+    if(snap.empty) return;
+    const pedido = snap.docs[0].data();
+    if(pedido.estado !== 'Pagado') return;
+
+    // Ya se confirmó el pago — detener el listener y el reset de 5 min
+    if(unsubscribePago) { unsubscribePago(); unsubscribePago = null; }
+    clearTimeout(resetPagoTimer);
+
+    const itemsTexto = (items||[]).map(i =>
+      `• ${i.nombre} (${i.talla}, ${i.color}) ×${i.cantidad} — $${(i.precio*i.cantidad).toLocaleString('es-MX')}`
+    ).join('\n');
+    const msg = `🛍️ *PEDIDO PLAYERAS BELOMA*\n\n` +
+      `📋 Folio: *${folio}*\n👤 Cliente: ${nombre}\n💳 Pago: Mercado Pago — confirmado ✅\n\n` +
+      `*Artículos:*\n${itemsTexto}\n\n💰 *Total: $${total.toLocaleString('es-MX')}*\n\n` +
+      `📍 Plaza Nájera Local 7, Av. Gutiérrez Nájera #511, Col. Reforma\n` +
+      `📱 WhatsApp: 669 154 9680\n🕐 Lun–Vie 9–17 · Sáb 11–15\n\n` +
+      `¡Gracias por tu pago! Te contactaremos pronto. 🙌`;
+
+    document.getElementById('exito-msg').innerHTML =
+      `<strong style="color:var(--green);">✅ Pago confirmado</strong><br>` +
+      `Total: <strong style="color:var(--green);">$${total.toLocaleString('es-MX')}</strong><br><br>` +
+      `📍 Plaza Nájera Local 7 · 669 154 9680`;
+
+    const telLimpio = (tel||'').replace(/[^0-9]/g,'');
+    const telWs = telLimpio.length === 10 ? '52' + telLimpio : telLimpio;
+    const urlWs = `https://wa.me/${telWs}?text=${encodeURIComponent(msg)}`;
+    document.getElementById('ws-btn-wrap').innerHTML = `
+      <a href="${urlWs}" target="_blank"
+        style="display:inline-flex;align-items:center;gap:10px;background:#25D366;color:#fff;
+               padding:16px 32px;border-radius:50px;font-size:17px;font-weight:700;
+               text-decoration:none;margin-bottom:16px;">
+        💬 Enviar resumen a mi WhatsApp
+      </a>`;
+
+    resetPagoTimer = setTimeout(() => nuevoCliente(), 60000);
+  }, err => {
+    console.error('Error escuchando confirmación de pago:', err);
+  });
 }
 
 function mostrarExito(folio, nombre, tel, metodo, total, msgWs) {
@@ -1101,6 +1136,8 @@ function mostrarExito(folio, nombre, tel, metodo, total, msgWs) {
 }
 
 window.nuevoCliente = function() {
+  if(unsubscribePago) { unsubscribePago(); unsubscribePago = null; }
+  clearTimeout(resetPagoTimer);
   carrito = [];
   actualizarBadge();
   document.getElementById('pantalla-exito').style.display = 'none';
