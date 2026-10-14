@@ -570,7 +570,7 @@
         <button class="opcion-btn" data-talla="M" onclick="selTalla(this)">M</button>
         <button class="opcion-btn" data-talla="L" onclick="selTalla(this)">L</button>
         <button class="opcion-btn" data-talla="XL" onclick="selTalla(this)">XL</button>
-        <button class="opcion-btn" data-talla="XXL" onclick="selTalla(this)">XXL</button>
+        <button class="opcion-btn" data-talla="2XL" onclick="selTalla(this)">2XL</button>
         <button class="opcion-btn" data-talla="3XL" onclick="selTalla(this)">3XL</button>
       </div>
 
@@ -800,7 +800,7 @@ window.abrirDetalle = function(id) {
   } else if(genero === 'Bebé Pañalero') {
     tallas = ['3 meses','6 meses','9 meses','12 meses','18 meses','24 meses'];
   } else {
-    tallas = ['S','M','L','XL','XXL','3XL']; // Hombre y sin género
+    tallas = ['S','M','L','XL','2XL','3XL']; // Hombre y sin género
   }
   const tallasWrap = document.getElementById('modal-tallas');
   tallasWrap.innerHTML = tallas.map((t,i) =>
