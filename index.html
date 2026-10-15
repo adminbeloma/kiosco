@@ -697,6 +697,37 @@ import { getFirestore, collection, onSnapshot, addDoc, getDocs, query, where, de
 // El token de Mercado Pago vive SOLO ahí (como secreto), nunca en este HTML.
 const PAGOS_WORKER_URL = 'https://kiosco-beloma-pagos.felipe-cristerna.workers.dev';
 
+// Al regresar de PayPal, la URL trae ?token=ORDEN&PayerID=...  Se le pide al Worker
+// que cobre (capture) la orden. No depende del webhook; el pedido se marca como
+// pagado en Firestore y la pantalla del kiosco que quedó esperando se actualiza sola.
+(function capturarPagoPayPalAlRegresar() {
+  try {
+    const p = new URLSearchParams(location.search);
+    const orderId = p.get('token');
+    if (p.get('pago') !== 'exitoso' || !orderId || !p.get('PayerID')) return;
+    history.replaceState(null, '', location.pathname);
+    const aviso = document.createElement('div');
+    aviso.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#1a1a1a;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;font:600 22px sans-serif;padding:24px';
+    aviso.textContent = 'Confirmando tu pago con PayPal…';
+    document.body.appendChild(aviso);
+    fetch(`${PAGOS_WORKER_URL}/api/capturar-orden-paypal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId })
+    }).then(r => r.json()).then(d => {
+      if (d && d.status === 'COMPLETED') {
+        aviso.textContent = '✅ Pago confirmado. ¡Gracias! Ya puedes cerrar esta pestaña.';
+      } else if (d && d.status) {
+        aviso.textContent = 'Tu pago quedó en revisión de PayPal (' + d.status + '). Avísanos por WhatsApp: 669 154 9680.';
+      } else {
+        aviso.textContent = 'No pudimos confirmar el pago. Avísanos por WhatsApp: 669 154 9680.';
+      }
+    }).catch(() => {
+      aviso.textContent = 'No pudimos confirmar el pago. Avísanos por WhatsApp: 669 154 9680.';
+    });
+  } catch (e) { console.error(e); }
+})();
+
 const firebaseConfig = {
   apiKey: "AIzaSyAvhG8RuytIv9rjsILWF8twyZeqTwfJ10I",
   authDomain: "adminbeloma.firebaseapp.com",
