@@ -1224,7 +1224,7 @@ function tarjetaDiseno(d, pequeña=false) {
     ${tag ? `<div style="position:absolute;top:8px;left:8px;font-size:16px;z-index:1;">${badges[tag]||''}</div>` : ''}
     <img src="${d.imagen||''}" alt="${d.nombre}"
       onerror="this.style.background='#333';this.removeAttribute('src')" loading="lazy"
-      style="width:100%;aspect-ratio:4/5;object-fit:cover;object-position:top center;display:block;">
+      style="width:100%;aspect-ratio:4/5;object-fit:cover;object-position:${d.imgPos||'top'} center;display:block;">
     <div class="info">
       <div class="nombre">${d.nombre}</div>
       <div class="categoria">${d.categoria||''}</div>
@@ -1799,13 +1799,22 @@ window.renderAdminDisenos = function() {
   let filtrados = diseños.slice();
   if(q) filtrados = filtrados.filter(d => d.nombre?.toLowerCase().includes(q) || d.categoria?.toLowerCase().includes(q));
   if(!filtrados.length) { lista.innerHTML = '<div style="color:var(--ink-soft);font-size:13px;text-align:center;padding:20px;">Sin diseños.</div>'; return; }
-  lista.innerHTML = filtrados.map(d => `
+  const POS_LABELS = { top:'Arriba', center:'Centro', bottom:'Abajo' };
+  lista.innerHTML = filtrados.map(d => {
+    const pos = d.imgPos || 'top';
+    const posBtns = Object.keys(POS_LABELS).map(p => `
+      <button onclick="actualizarImgPos('${d.id}','${p}')"
+        style="padding:3px 8px;border-radius:6px;font-size:10px;cursor:pointer;font-family:'Inter',sans-serif;
+               border:1px solid ${p===pos?'var(--green)':'var(--border)'};
+               background:${p===pos?'var(--green)':'transparent'};
+               color:${p===pos?'#fff':'var(--ink-soft)'};">${POS_LABELS[p]}</button>`).join('');
+    return `
     <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);">
-      <img src="${d.imagen||''}" style="width:50px;height:50px;object-fit:cover;border-radius:8px;flex-shrink:0;background:#333;">
+      <img src="${d.imagen||''}" style="width:50px;height:60px;object-fit:cover;object-position:${pos} center;border-radius:8px;flex-shrink:0;background:#333;">
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.nombre}</div>
         <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px;">${d.categoria}</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
           <label style="font-size:11px;color:var(--ink-soft);">$
             <input type="number" value="${(+d.precio||0)}" step="1" style="width:70px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);font-family:'Inter',sans-serif;font-size:12px;"
               onchange="actualizarCampoDiseno('${d.id}','precio', this.value, this)">
@@ -1819,13 +1828,22 @@ window.renderAdminDisenos = function() {
               onchange="actualizarCampoDiseno('${d.id}','precio3xl', this.value, this)">
           </label>
         </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:10px;color:var(--ink-soft);">Encuadre:</span>
+          ${posBtns}
+          <label style="margin-left:auto;cursor:pointer;">
+            <input type="file" accept="image/*" style="display:none" onchange="cambiarImagenDiseno('${d.id}', this)">
+            <span style="font-size:11px;color:var(--green);text-decoration:underline;">🖼 Cambiar foto</span>
+          </label>
+        </div>
       </div>
       <button onclick="eliminarDisenoKiosco('${d.id}')"
         style="background:#C0392B;color:#fff;border:none;padding:8px 12px;border-radius:8px;
                font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;flex-shrink:0;">
         🗑 Eliminar
       </button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 };
 
 window.actualizarCampoDiseno = async function(id, campo, valor, inputEl) {
@@ -1846,6 +1864,49 @@ window.actualizarCampoDiseno = async function(id, campo, valor, inputEl) {
   } catch(e) {
     console.error('Error al actualizar diseño:', e);
     toastKiosco('❌ Error al guardar');
+  }
+};
+
+window.actualizarImgPos = async function(id, pos) {
+  try {
+    const snap = await getDocs(query(collection(db,'ksk_disenos'), where('id','==',id)));
+    if(snap.empty) { toastKiosco('❌ No se encontró el diseño'); return; }
+    await updateDoc(snap.docs[0].ref, { imgPos: pos });
+    const local = diseños.find(d => d.id === id);
+    if(local) local.imgPos = pos;
+    renderAdminDisenos();
+    toastKiosco('✅ Encuadre actualizado');
+  } catch(e) {
+    console.error('Error al actualizar encuadre:', e);
+    toastKiosco('❌ Error al guardar');
+  }
+};
+
+window.cambiarImagenDiseno = async function(id, inputEl) {
+  const file = inputEl.files[0];
+  if(!file) return;
+  toastKiosco('⏳ Subiendo nueva foto...');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', PRESET_KSK);
+    fd.append('folder', 'kiosco-beloma');
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_KSK}/image/upload`, { method:'POST', body:fd });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error.message);
+
+    const snap = await getDocs(query(collection(db,'ksk_disenos'), where('id','==',id)));
+    if(snap.empty) { toastKiosco('❌ No se encontró el diseño'); return; }
+    await updateDoc(snap.docs[0].ref, { imagen: data.secure_url });
+    const local = diseños.find(d => d.id === id);
+    if(local) local.imagen = data.secure_url;
+    renderAdminDisenos();
+    toastKiosco('✅ Foto actualizada');
+  } catch(e) {
+    console.error('Error al cambiar imagen:', e);
+    toastKiosco('❌ Error al subir la foto');
+  } finally {
+    inputEl.value = '';
   }
 };
 
