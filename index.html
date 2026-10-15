@@ -644,11 +644,14 @@
         <button class="metodo-btn" data-metodo="mercadopago" onclick="selMetodo(this)">
           <span class="metodo-icon">📱</span>Link Mercado Pago
         </button>
+        <button class="metodo-btn" data-metodo="paypal" onclick="selMetodo(this)">
+          <span class="metodo-icon">🅿️</span>PayPal
+        </button>
       </div>
 
-      <!-- Panel de Mercado Pago link -->
+      <!-- Panel de pago en línea (Mercado Pago / PayPal) -->
       <div id="mp-panel" style="display:none;background:var(--dark);border-radius:14px;padding:20px;margin-bottom:16px;text-align:center;">
-        <div style="font-size:14px;color:var(--ink-soft);">Pago en línea próximamente disponible.<br>Por favor selecciona otro método.</div>
+        <div style="font-size:14px;color:var(--ink-soft);">Al confirmar, te mostramos el link de pago — tu pedido se marca pagado automáticamente en cuanto termines.</div>
       </div>
 
       <!-- Info del local -->
@@ -941,7 +944,8 @@ window.selMetodo = function(btn) {
   metodoPago = btn.dataset.metodo;
   document.querySelectorAll('[data-metodo]').forEach(b => b.classList.remove('sel'));
   btn.classList.add('sel');
-  document.getElementById('mp-panel').style.display = metodoPago === 'mercadopago' ? 'block' : 'none';
+  document.getElementById('mp-panel').style.display =
+    (metodoPago === 'mercadopago' || metodoPago === 'paypal') ? 'block' : 'none';
 };
 
 // ── MERCADO PAGO CHECKOUT PRO (vía Worker — el token nunca viaja al navegador) ──
@@ -961,6 +965,23 @@ async function crearPreferenciaMercadoPago(folio, nombre, email, total, items) {
   }
 }
 
+// ── PAYPAL (vía Worker — las credenciales nunca viajan al navegador) ──
+async function crearOrdenPayPal(folio, total) {
+  try {
+    const resp = await fetch(`${PAGOS_WORKER_URL}/api/crear-orden-paypal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folio, total })
+    });
+    if(!resp.ok) throw new Error('Error del Worker de pagos: ' + resp.status);
+    const data = await resp.json();
+    return data.approve_url || null;
+  } catch(e) {
+    console.error('Error PayPal:', e);
+    return null;
+  }
+}
+
 window.confirmarPedido = async function() {
   const nombre = document.getElementById('pedido-nombre').value.trim();
   const tel    = document.getElementById('pedido-tel').value.trim();
@@ -970,7 +991,8 @@ window.confirmarPedido = async function() {
 
   const folio = 'KSK-' + Date.now().toString(36).toUpperCase().slice(-6);
   const total = carrito.reduce((s,i) => s + i.precio * i.cantidad, 0);
-  const metodosTexto = { efectivo:'Efectivo al recoger', transferencia:'Transferencia', terminal:'Terminal Mercado Pago', mercadopago:'Link Mercado Pago' };
+  const metodosTexto = { efectivo:'Efectivo al recoger', transferencia:'Transferencia', terminal:'Terminal Mercado Pago', mercadopago:'Link Mercado Pago', paypal:'PayPal' };
+  const esPagoEnLinea = metodoPago === 'mercadopago' || metodoPago === 'paypal';
 
   const pedidoData = {
     folio, nombre, tel, email,
@@ -979,7 +1001,7 @@ window.confirmarPedido = async function() {
       nombre: i.nombre, talla: i.talla, color: i.color,
       cantidad: i.cantidad, precio: i.precio, notas: i.notas || ''
     })),
-    canal: 'Quiosco', estado: metodoPago === 'mercadopago' ? 'Pago pendiente' : 'Nuevo',
+    canal: 'Quiosco', estado: esPagoEnLinea ? 'Pago pendiente' : 'Nuevo',
     creado: new Date().toISOString()
   };
 
@@ -991,16 +1013,18 @@ window.confirmarPedido = async function() {
   try {
     await addDoc(collection(db, 'pl_pedidos_kiosco'), pedidoData);
 
-    // Si es Mercado Pago → generar link de pago
-    if(metodoPago === 'mercadopago') {
-      const mpUrl = await crearPreferenciaMercadoPago(folio, nombre, email, total, pedidoData.items);
+    // Si es un método de pago en línea → generar el link con la pasarela correspondiente
+    if(esPagoEnLinea) {
+      const linkPago = metodoPago === 'mercadopago'
+        ? await crearPreferenciaMercadoPago(folio, nombre, email, total, pedidoData.items)
+        : await crearOrdenPayPal(folio, total);
       btnConfirmar.disabled = false;
       btnConfirmar.textContent = '✅ Confirmar pedido';
 
-      if(mpUrl) {
+      if(linkPago) {
         document.getElementById('modal-pedido').classList.remove('open');
-        // Mostrar pantalla de redireccion a MP y empezar a escuchar la confirmación automática
-        mostrarRedirectMP(folio, nombre, tel, total, mpUrl, pedidoData.items);
+        // Mostrar pantalla de redirección y empezar a escuchar la confirmación automática
+        mostrarRedirectMP(folio, nombre, tel, total, linkPago, pedidoData.items, metodoPago);
         return;
       } else {
         alert('No se pudo generar el link de pago. Por favor selecciona otro método.');
@@ -1034,20 +1058,28 @@ window.confirmarPedido = async function() {
 let unsubscribePago = null; // cancela el listener de confirmación si ya no aplica
 let resetPagoTimer   = null;
 
-function mostrarRedirectMP(folio, nombre, tel, total, mpUrl, items) {
-  // Mostrar pantalla de redirección a Mercado Pago, esperando confirmación automática
+// Datos de marca por pasarela, para que el botón de pago y los mensajes
+// se vean correctos sea Mercado Pago o PayPal.
+const PASARELAS = {
+  mercadopago: { nombre: 'Mercado Pago', color: '#009EE3', icono: '💳' },
+  paypal:      { nombre: 'PayPal',       color: '#003087', icono: '🅿️' },
+};
+
+function mostrarRedirectMP(folio, nombre, tel, total, urlPago, items, proveedor) {
+  // Mostrar pantalla de redirección a la pasarela elegida, esperando confirmación automática
+  const p = PASARELAS[proveedor] || PASARELAS.mercadopago;
   const exito = document.getElementById('pantalla-exito');
   document.getElementById('exito-folio').textContent = '# ' + folio;
   document.getElementById('exito-msg').innerHTML =
-    `Serás redirigido a Mercado Pago para completar tu pago.<br>` +
+    `Serás redirigido a ${p.nombre} para completar tu pago.<br>` +
     `<strong style="color:var(--green);">Total: $${total.toLocaleString('es-MX')}</strong><br><br>` +
     `<span id="estado-pago-txt">⏳ En cuanto pagues, esta pantalla se actualiza sola — no cierres.</span>`;
   document.getElementById('ws-btn-wrap').innerHTML = `
-    <a href="${mpUrl}" target="_blank"
-      style="display:inline-flex;align-items:center;gap:10px;background:#009EE3;color:#fff;
+    <a href="${urlPago}" target="_blank"
+      style="display:inline-flex;align-items:center;gap:10px;background:${p.color};color:#fff;
              padding:16px 32px;border-radius:50px;font-size:17px;font-weight:700;
              text-decoration:none;margin-bottom:16px;">
-      💳 Pagar con Mercado Pago
+      ${p.icono} Pagar con ${p.nombre}
     </a>`;
   exito.style.display = 'flex';
 
@@ -1075,11 +1107,12 @@ function escucharConfirmacionPago(folio, nombre, tel, total, items) {
     if(unsubscribePago) { unsubscribePago(); unsubscribePago = null; }
     clearTimeout(resetPagoTimer);
 
+    const p = PASARELAS[pedido.metodoPagoConfirmado] || PASARELAS[pedido.metodoPago] || PASARELAS.mercadopago;
     const itemsTexto = (items||[]).map(i =>
       `• ${i.nombre} (${i.talla}, ${i.color}) ×${i.cantidad} — $${(i.precio*i.cantidad).toLocaleString('es-MX')}`
     ).join('\n');
     const msg = `🛍️ *PEDIDO PLAYERAS BELOMA*\n\n` +
-      `📋 Folio: *${folio}*\n👤 Cliente: ${nombre}\n💳 Pago: Mercado Pago — confirmado ✅\n\n` +
+      `📋 Folio: *${folio}*\n👤 Cliente: ${nombre}\n💳 Pago: ${p.nombre} — confirmado ✅\n\n` +
       `*Artículos:*\n${itemsTexto}\n\n💰 *Total: $${total.toLocaleString('es-MX')}*\n\n` +
       `📍 Plaza Nájera Local 7, Av. Gutiérrez Nájera #511, Col. Reforma\n` +
       `📱 WhatsApp: 669 154 9680\n🕐 Lun–Vie 9–17 · Sáb 11–15\n\n` +
@@ -1109,7 +1142,7 @@ function escucharConfirmacionPago(folio, nombre, tel, total, items) {
 
 function mostrarExito(folio, nombre, tel, metodo, total, msgWs) {
   document.getElementById('exito-folio').textContent = '# ' + folio;
-  const metodosTexto = { efectivo:'Efectivo al recoger', transferencia:'Transferencia', terminal:'Terminal Mercado Pago', mercadopago:'Link Mercado Pago' };
+  const metodosTexto = { efectivo:'Efectivo al recoger', transferencia:'Transferencia', terminal:'Terminal Mercado Pago', mercadopago:'Link Mercado Pago', paypal:'PayPal' };
   document.getElementById('exito-msg').innerHTML =
     `Tu pedido ha sido registrado exitosamente.<br>` +
     `Método de pago: <strong>${metodosTexto[metodo]||metodo}</strong><br>` +
