@@ -1791,11 +1791,69 @@ const PRESET_KSK = 'seguro_ahorras';
 
 window.cambiarTabAdmin = function(tab) {
   document.querySelectorAll('[data-atab]').forEach(b => b.classList.toggle('activo', b.dataset.atab===tab));
-  ['agregar','gestionar','etiquetas'].forEach(t => {
+  ['agregar','gestionar','etiquetas','pedidos'].forEach(t => {
     const el = document.getElementById('atab-'+t);
     if(el) el.style.display = t===tab ? 'block' : 'none';
   });
   if(tab === 'gestionar') renderAdminDisenos();
+  if(tab === 'pedidos') cargarAdminPedidos();
+};
+
+// ── Pedidos del kiosco (panel admin) ──
+let adminPedidos = [];
+const ESTADOS_PEDIDO = ['Pago pendiente','Pagado','Nuevo','Entregado','Cancelado'];
+const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+window.cargarAdminPedidos = async function() {
+  const lista = document.getElementById('apedidos-lista');
+  if(lista) lista.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink-soft);">Cargando…</div>';
+  try {
+    const snap = await getDocs(collection(db, 'pl_pedidos_kiosco'));
+    adminPedidos = snap.docs.map(d => ({ _id: d.id, ...d.data() }))
+      .sort((a, b) => String(b.creado || '').localeCompare(String(a.creado || '')))
+      .slice(0, 100);
+    renderAdminPedidos();
+  } catch(e) {
+    console.error(e);
+    if(lista) lista.innerHTML = '<div style="padding:20px;text-align:center;color:#e55;">No se pudieron cargar los pedidos.</div>';
+  }
+};
+
+window.renderAdminPedidos = function() {
+  const lista = document.getElementById('apedidos-lista'); if(!lista) return;
+  const filtro = document.getElementById('apedidos-filtro')?.value || '';
+  const rows = adminPedidos.filter(p => !filtro || p.estado === filtro);
+  if(!rows.length) { lista.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink-soft);">Sin pedidos.</div>'; return; }
+  const color = e => ({ 'Pagado':'#2e9e3e', 'Entregado':'#3b82f6', 'Pago pendiente':'#e0a100', 'Nuevo':'#8a8a8a', 'Cancelado':'#d33' }[e] || '#8a8a8a');
+  lista.innerHTML = rows.map(p => {
+    const fecha = p.creado ? new Date(p.creado).toLocaleString('es-MX', { dateStyle:'short', timeStyle:'short' }) : '';
+    const metodo = p.metodoPagoConfirmado || p.metodoPago || '';
+    const items = (p.items || []).map(i => `${escHtml(i.cantidad)}× ${escHtml(i.nombre)} (${escHtml(i.talla)}${i.color ? ', ' + escHtml(i.color) : ''})`).join('<br>');
+    const opts = ESTADOS_PEDIDO.map(e => `<option ${e === p.estado ? 'selected' : ''}>${e}</option>`).join('');
+    return `<div style="border-bottom:1px solid var(--border);padding:12px 4px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <b style="font-size:14px;">${escHtml(p.folio)}</b>
+        <span style="font-size:11px;font-weight:700;color:#fff;background:${color(p.estado)};border-radius:10px;padding:3px 9px;">${escHtml(p.estado)}</span>
+      </div>
+      <div style="font-size:12px;color:var(--ink-soft);margin:3px 0;">${escHtml(fecha)} · ${escHtml(p.nombre)} · ${escHtml(p.tel)}</div>
+      <div style="font-size:12px;margin:3px 0;">${items}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;">
+        <span style="font-size:13px;font-weight:700;">$${escHtml(p.total)} · ${escHtml(metodo)}</span>
+        <select onchange="cambiarEstadoPedido('${p._id}', this.value)" style="background:var(--dark);border:1.5px solid var(--border);border-radius:8px;padding:6px 8px;color:var(--ink);font-size:12px;font-family:'Inter',sans-serif;">${opts}</select>
+      </div>
+    </div>`;
+  }).join('');
+};
+
+window.cambiarEstadoPedido = async function(docId, estado) {
+  try {
+    await updateDoc(doc(db, 'pl_pedidos_kiosco', docId), { estado });
+    const p = adminPedidos.find(x => x._id === docId); if(p) p.estado = estado;
+    renderAdminPedidos();
+  } catch(e) {
+    console.error(e);
+    alert('No se pudo cambiar el estado.');
+  }
 };
 
 window.previewAksk = function(input) {
@@ -2000,6 +2058,7 @@ window.eliminarDisenoKiosco = async function(id) {
         <button class="reporte-tab activo" data-atab="agregar" onclick="cambiarTabAdmin('agregar')">➕ Agregar</button>
         <button class="reporte-tab" data-atab="gestionar" onclick="cambiarTabAdmin('gestionar')">🗂 Gestionar</button>
         <button class="reporte-tab" data-atab="etiquetas" onclick="cambiarTabAdmin('etiquetas')">🏷 Etiquetas</button>
+        <button class="reporte-tab" data-atab="pedidos" onclick="cambiarTabAdmin('pedidos')">📦 Pedidos</button>
       </div>
       <!-- Tab Agregar -->
       <div id="atab-agregar">
@@ -2060,6 +2119,17 @@ window.eliminarDisenoKiosco = async function(id) {
       <div id="atab-gestionar" style="display:none;">
         <input type="text" id="aksk-buscar" placeholder="🔍 Buscar..." oninput="renderAdminDisenos()" style="width:100%;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;margin-bottom:12px;">
         <div id="aksk-lista" style="max-height:400px;overflow-y:auto;"></div>
+      </div>
+      <!-- Tab Pedidos -->
+      <div id="atab-pedidos" style="display:none;">
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <select id="apedidos-filtro" onchange="renderAdminPedidos()" style="flex:1;background:var(--dark);border:2px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;outline:none;">
+            <option value="">Todos los estados</option>
+            <option>Pago pendiente</option><option>Pagado</option><option>Nuevo</option><option>Entregado</option><option>Cancelado</option>
+          </select>
+          <button onclick="cargarAdminPedidos()" style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;">🔄 Actualizar</button>
+        </div>
+        <div id="apedidos-lista" style="max-height:420px;overflow-y:auto;"></div>
       </div>
       <!-- Tab Etiquetas -->
       <div id="atab-etiquetas" style="display:none;">
